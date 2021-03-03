@@ -6,4 +6,4 @@ FROM gitpod/workspace-full
 #
 # More information: https://www.gitpod.io/docs/config-docker/
 
-RUN npm install -g node-red
+RUN npm install -g node-red svelte-integration-red

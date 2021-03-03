@@ -1,9 +1,10 @@
 <script context="module">
     RED.nodes.registerType("shuttle-control", {
 		name: { value: "shuttle-control" },
-		category: "Node-RED",
+		category: "Runtime",
 		color: "#D9A6AB",
 		defaults: {
+			runtimeId: { value: "", label: "Runtime ID" },
 			action: { value: "start", label: "Action" },
             runtime: { value: "latest", label: "Runtime" },
             project: { value: "", label: "Project" }
@@ -33,7 +34,7 @@
 	export let node
 	import { Select, Input } from 'svelte-integration-red/components'
 </script>
-<Input {node} prop="name" />
+<Input {node} prop="runtimeId" placeholder='project name if not defined' />
 <Select bind:node prop="action">
 	<option value="start">Start runtime</option>
 	<option value="stop">Stop runtime</option>

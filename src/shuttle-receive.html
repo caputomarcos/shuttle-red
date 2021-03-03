@@ -34,6 +34,12 @@
                   delete node.__clone
                 }
                 function noop() { }
+function assign(tar, src) {
+    // @ts-ignore
+    for (const k in src)
+        tar[k] = src[k];
+    return tar;
+}
 function run(fn) {
     return fn();
 }
@@ -52,16 +58,144 @@ function safe_not_equal(a, b) {
 function is_empty(obj) {
     return Object.keys(obj).length === 0;
 }
+function create_slot(definition, ctx, $$scope, fn) {
+    if (definition) {
+        const slot_ctx = get_slot_context(definition, ctx, $$scope, fn);
+        return definition[0](slot_ctx);
+    }
+}
+function get_slot_context(definition, ctx, $$scope, fn) {
+    return definition[1] && fn
+        ? assign($$scope.ctx.slice(), definition[1](fn(ctx)))
+        : $$scope.ctx;
+}
+function get_slot_changes(definition, $$scope, dirty, fn) {
+    if (definition[2] && fn) {
+        const lets = definition[2](fn(dirty));
+        if ($$scope.dirty === undefined) {
+            return lets;
+        }
+        if (typeof lets === 'object') {
+            const merged = [];
+            const len = Math.max($$scope.dirty.length, lets.length);
+            for (let i = 0; i < len; i += 1) {
+                merged[i] = $$scope.dirty[i] | lets[i];
+            }
+            return merged;
+        }
+        return $$scope.dirty | lets;
+    }
+    return $$scope.dirty;
+}
+function update_slot(slot, slot_definition, ctx, $$scope, dirty, get_slot_changes_fn, get_slot_context_fn) {
+    const slot_changes = get_slot_changes(slot_definition, $$scope, dirty, get_slot_changes_fn);
+    if (slot_changes) {
+        const slot_context = get_slot_context(slot_definition, ctx, $$scope, get_slot_context_fn);
+        slot.p(slot_context, slot_changes);
+    }
+}
+
+function append(target, node) {
+    target.appendChild(node);
+}
+function insert(target, node, anchor) {
+    target.insertBefore(node, anchor || null);
+}
 function detach(node) {
     node.parentNode.removeChild(node);
 }
+function element(name) {
+    return document.createElement(name);
+}
+function text(data) {
+    return document.createTextNode(data);
+}
+function space() {
+    return text(' ');
+}
+function empty() {
+    return text('');
+}
+function listen(node, event, handler, options) {
+    node.addEventListener(event, handler, options);
+    return () => node.removeEventListener(event, handler, options);
+}
+function attr(node, attribute, value) {
+    if (value == null)
+        node.removeAttribute(attribute);
+    else if (node.getAttribute(attribute) !== value)
+        node.setAttribute(attribute, value);
+}
+function to_number(value) {
+    return value === '' ? null : +value;
+}
 function children(element) {
     return Array.from(element.childNodes);
+}
+function set_data(text, data) {
+    data = '' + data;
+    if (text.wholeText !== data)
+        text.data = data;
+}
+function set_input_value(input, value) {
+    input.value = value == null ? '' : value;
+}
+function set_style(node, key, value, important) {
+    node.style.setProperty(key, value, important ? 'important' : '');
+}
+function select_option(select, value) {
+    for (let i = 0; i < select.options.length; i += 1) {
+        const option = select.options[i];
+        if (option.__value === value) {
+            option.selected = true;
+            return;
+        }
+    }
+}
+function select_value(select) {
+    const selected_option = select.querySelector(':checked') || select.options[0];
+    return selected_option && selected_option.__value;
+}
+function custom_event(type, detail) {
+    const e = document.createEvent('CustomEvent');
+    e.initCustomEvent(type, false, false, detail);
+    return e;
 }
 
 let current_component;
 function set_current_component(component) {
     current_component = component;
+}
+function get_current_component() {
+    if (!current_component)
+        throw new Error('Function called outside component initialization');
+    return current_component;
+}
+function onMount(fn) {
+    get_current_component().$$.on_mount.push(fn);
+}
+function createEventDispatcher() {
+    const component = get_current_component();
+    return (type, detail) => {
+        const callbacks = component.$$.callbacks[type];
+        if (callbacks) {
+            // TODO are there situations where events could be dispatched
+            // in a server (non-DOM) environment?
+            const event = custom_event(type, detail);
+            callbacks.slice().forEach(fn => {
+                fn.call(component, event);
+            });
+        }
+    };
+}
+// TODO figure out if we still want to support
+// shorthand events, or if we want to implement
+// a real bubbling mechanism
+function bubble(component, event) {
+    const callbacks = component.$$.callbacks[event.type];
+    if (callbacks) {
+        callbacks.slice().forEach(fn => fn(event));
+    }
 }
 
 const dirty_components = [];
@@ -78,6 +212,9 @@ function schedule_update() {
 }
 function add_render_callback(fn) {
     render_callbacks.push(fn);
+}
+function add_flush_callback(fn) {
+    flush_callbacks.push(fn);
 }
 let flushing = false;
 const seen_callbacks = new Set();
@@ -128,11 +265,137 @@ function update$1($$) {
     }
 }
 const outroing = new Set();
+let outros;
+function group_outros() {
+    outros = {
+        r: 0,
+        c: [],
+        p: outros // parent group
+    };
+}
+function check_outros() {
+    if (!outros.r) {
+        run_all(outros.c);
+    }
+    outros = outros.p;
+}
 function transition_in(block, local) {
     if (block && block.i) {
         outroing.delete(block);
         block.i(local);
     }
+}
+function transition_out(block, local, detach, callback) {
+    if (block && block.o) {
+        if (outroing.has(block))
+            return;
+        outroing.add(block);
+        outros.c.push(() => {
+            outroing.delete(block);
+            if (callback) {
+                if (detach)
+                    block.d(1);
+                callback();
+            }
+        });
+        block.o(local);
+    }
+}
+
+function destroy_block(block, lookup) {
+    block.d(1);
+    lookup.delete(block.key);
+}
+function outro_and_destroy_block(block, lookup) {
+    transition_out(block, 1, 1, () => {
+        lookup.delete(block.key);
+    });
+}
+function update_keyed_each(old_blocks, dirty, get_key, dynamic, ctx, list, lookup, node, destroy, create_each_block, next, get_context) {
+    let o = old_blocks.length;
+    let n = list.length;
+    let i = o;
+    const old_indexes = {};
+    while (i--)
+        old_indexes[old_blocks[i].key] = i;
+    const new_blocks = [];
+    const new_lookup = new Map();
+    const deltas = new Map();
+    i = n;
+    while (i--) {
+        const child_ctx = get_context(ctx, list, i);
+        const key = get_key(child_ctx);
+        let block = lookup.get(key);
+        if (!block) {
+            block = create_each_block(key, child_ctx);
+            block.c();
+        }
+        else if (dynamic) {
+            block.p(child_ctx, dirty);
+        }
+        new_lookup.set(key, new_blocks[i] = block);
+        if (key in old_indexes)
+            deltas.set(key, Math.abs(i - old_indexes[key]));
+    }
+    const will_move = new Set();
+    const did_move = new Set();
+    function insert(block) {
+        transition_in(block, 1);
+        block.m(node, next);
+        lookup.set(block.key, block);
+        next = block.first;
+        n--;
+    }
+    while (o && n) {
+        const new_block = new_blocks[n - 1];
+        const old_block = old_blocks[o - 1];
+        const new_key = new_block.key;
+        const old_key = old_block.key;
+        if (new_block === old_block) {
+            // do nothing
+            next = new_block.first;
+            o--;
+            n--;
+        }
+        else if (!new_lookup.has(old_key)) {
+            // remove old block
+            destroy(old_block, lookup);
+            o--;
+        }
+        else if (!lookup.has(new_key) || will_move.has(new_key)) {
+            insert(new_block);
+        }
+        else if (did_move.has(old_key)) {
+            o--;
+        }
+        else if (deltas.get(new_key) > deltas.get(old_key)) {
+            did_move.add(new_key);
+            insert(new_block);
+        }
+        else {
+            will_move.add(old_key);
+            o--;
+        }
+    }
+    while (o--) {
+        const old_block = old_blocks[o];
+        if (!new_lookup.has(old_block.key))
+            destroy(old_block, lookup);
+    }
+    while (n)
+        insert(new_blocks[n - 1]);
+    return new_blocks;
+}
+
+function bind(component, name, callback) {
+    const index = component.$$.props[name];
+    if (index !== undefined) {
+        component.$$.bound[index] = callback;
+        callback(component.$$.ctx[index]);
+    }
+}
+function create_component(block) {
+    block && block.c();
 }
 function mount_component(component, target, anchor, customElement) {
     const { fragment, on_mount, on_destroy, after_update } = component.$$;
@@ -258,13 +521,2817 @@ class SvelteComponent {
     }
 }
 
+/* node_modules/svelte-integration-red/components/Row.svelte generated by Svelte v3.35.0 */
+
+function create_fragment$5(ctx) {
+	let div;
+	let current;
+	const default_slot_template = /*#slots*/ ctx[2].default;
+	const default_slot = create_slot(default_slot_template, ctx, /*$$scope*/ ctx[1], null);
+
+	return {
+		c() {
+			div = element("div");
+			if (default_slot) default_slot.c();
+			attr(div, "class", "form-row");
+			attr(div, "style", /*style*/ ctx[0]);
+		},
+		m(target, anchor) {
+			insert(target, div, anchor);
+
+			if (default_slot) {
+				default_slot.m(div, null);
+			}
+
+			current = true;
+		},
+		p(ctx, [dirty]) {
+			if (default_slot) {
+				if (default_slot.p && dirty & /*$$scope*/ 2) {
+					update_slot(default_slot, default_slot_template, ctx, /*$$scope*/ ctx[1], dirty, null, null);
+				}
+			}
+
+			if (!current || dirty & /*style*/ 1) {
+				attr(div, "style", /*style*/ ctx[0]);
+			}
+		},
+		i(local) {
+			if (current) return;
+			transition_in(default_slot, local);
+			current = true;
+		},
+		o(local) {
+			transition_out(default_slot, local);
+			current = false;
+		},
+		d(detaching) {
+			if (detaching) detach(div);
+			if (default_slot) default_slot.d(detaching);
+		}
+	};
+}
+
+function instance$5($$self, $$props, $$invalidate) {
+	let { $$slots: slots = {}, $$scope } = $$props;
+	let { style } = $$props;
+
+	$$self.$$set = $$props => {
+		if ("style" in $$props) $$invalidate(0, style = $$props.style);
+		if ("$$scope" in $$props) $$invalidate(1, $$scope = $$props.$$scope);
+	};
+
+	return [style, $$scope, slots];
+}
+
+class Row extends SvelteComponent {
+	constructor(options) {
+		super();
+		init(this, options, instance$5, create_fragment$5, safe_not_equal, { style: 0 });
+	}
+}
+
+/* node_modules/svelte-integration-red/components/PlainInput.svelte generated by Svelte v3.35.0 */
+
+function create_else_block_1$1(ctx) {
+	let span;
+
+	return {
+		c() {
+			span = element("span");
+			span.textContent = "Error: No property name given.";
+			set_style(span, "width", "100%");
+		},
+		m(target, anchor) {
+			insert(target, span, anchor);
+		},
+		p: noop,
+		d(detaching) {
+			if (detaching) detach(span);
+		}
+	};
+}
+
+// (50:0) {#if !updateNode || prop}
+function create_if_block$3(ctx) {
+	let t;
+	let if_block1_anchor;
+	let if_block0 = /*type*/ ctx[2] !== "checkbox" && /*label*/ ctx[3] && create_if_block_8(ctx);
+
+	function select_block_type_1(ctx, dirty) {
+		if (/*type*/ ctx[2] === "text") return create_if_block_1$3;
+		if (/*type*/ ctx[2] === "number") return create_if_block_2$1;
+		if (/*type*/ ctx[2] === "checkbox") return create_if_block_3;
+		if (/*type*/ ctx[2] === "password") return create_if_block_5;
+		if (/*type*/ ctx[2] === "email") return create_if_block_6;
+		if (/*type*/ ctx[2] === "url") return create_if_block_7;
+		return create_else_block$2;
+	}
+
+	let current_block_type = select_block_type_1(ctx);
+	let if_block1 = current_block_type(ctx);
+
+	return {
+		c() {
+			if (if_block0) if_block0.c();
+			t = space();
+			if_block1.c();
+			if_block1_anchor = empty();
+		},
+		m(target, anchor) {
+			if (if_block0) if_block0.m(target, anchor);
+			insert(target, t, anchor);
+			if_block1.m(target, anchor);
+			insert(target, if_block1_anchor, anchor);
+		},
+		p(ctx, dirty) {
+			if (/*type*/ ctx[2] !== "checkbox" && /*label*/ ctx[3]) {
+				if (if_block0) {
+					if_block0.p(ctx, dirty);
+				} else {
+					if_block0 = create_if_block_8(ctx);
+					if_block0.c();
+					if_block0.m(t.parentNode, t);
+				}
+			} else if (if_block0) {
+				if_block0.d(1);
+				if_block0 = null;
+			}
+
+			if (current_block_type === (current_block_type = select_block_type_1(ctx)) && if_block1) {
+				if_block1.p(ctx, dirty);
+			} else {
+				if_block1.d(1);
+				if_block1 = current_block_type(ctx);
+
+				if (if_block1) {
+					if_block1.c();
+					if_block1.m(if_block1_anchor.parentNode, if_block1_anchor);
+				}
+			}
+		},
+		d(detaching) {
+			if (if_block0) if_block0.d(detaching);
+			if (detaching) detach(t);
+			if_block1.d(detaching);
+			if (detaching) detach(if_block1_anchor);
+		}
+	};
+}
+
+// (51:4) {#if type !== 'checkbox' && label}
+function create_if_block_8(ctx) {
+	let label_1;
+	let t0;
+	let t1;
+	let label_1_for_value;
+	let mounted;
+	let dispose;
+	let if_block = /*icon*/ ctx[6] && create_if_block_9(ctx);
+
+	return {
+		c() {
+			label_1 = element("label");
+			if (if_block) if_block.c();
+			t0 = space();
+			t1 = text(/*label*/ ctx[3]);
+			attr(label_1, "for", label_1_for_value = "node-input-" + /*id*/ ctx[1]);
+		},
+		m(target, anchor) {
+			insert(target, label_1, anchor);
+			if (if_block) if_block.m(label_1, null);
+			append(label_1, t0);
+			append(label_1, t1);
+
+			if (!mounted) {
+				dispose = [
+					listen(label_1, "mouseenter", /*mouseenter_handler*/ ctx[26]),
+					listen(label_1, "mouseleave", /*mouseleave_handler*/ ctx[27])
+				];
+
+				mounted = true;
+			}
+		},
+		p(ctx, dirty) {
+			if (/*icon*/ ctx[6]) {
+				if (if_block) {
+					if_block.p(ctx, dirty);
+				} else {
+					if_block = create_if_block_9(ctx);
+					if_block.c();
+					if_block.m(label_1, t0);
+				}
+			} else if (if_block) {
+				if_block.d(1);
+				if_block = null;
+			}
+
+			if (dirty[0] & /*label*/ 8) set_data(t1, /*label*/ ctx[3]);
+
+			if (dirty[0] & /*id*/ 2 && label_1_for_value !== (label_1_for_value = "node-input-" + /*id*/ ctx[1])) {
+				attr(label_1, "for", label_1_for_value);
+			}
+		},
+		d(detaching) {
+			if (detaching) detach(label_1);
+			if (if_block) if_block.d();
+			mounted = false;
+			run_all(dispose);
+		}
+	};
+}
+
+// (52:65) {#if icon}
+function create_if_block_9(ctx) {
+	let i;
+	let i_class_value;
+
+	return {
+		c() {
+			i = element("i");
+			attr(i, "class", i_class_value = "fa fa-" + /*icon*/ ctx[6]);
+		},
+		m(target, anchor) {
+			insert(target, i, anchor);
+		},
+		p(ctx, dirty) {
+			if (dirty[0] & /*icon*/ 64 && i_class_value !== (i_class_value = "fa fa-" + /*icon*/ ctx[6])) {
+				attr(i, "class", i_class_value);
+			}
+		},
+		d(detaching) {
+			if (detaching) detach(i);
+		}
+	};
+}
+
+// (69:4) {:else}
+function create_else_block$2(ctx) {
+	let span;
+	let t0;
+	let t1;
+	let t2;
+
+	return {
+		c() {
+			span = element("span");
+			t0 = text("Error: Unsupported property type '");
+			t1 = text(/*type*/ ctx[2]);
+			t2 = text("'.");
+		},
+		m(target, anchor) {
+			insert(target, span, anchor);
+			append(span, t0);
+			append(span, t1);
+			append(span, t2);
+		},
+		p(ctx, dirty) {
+			if (dirty[0] & /*type*/ 4) set_data(t1, /*type*/ ctx[2]);
+		},
+		d(detaching) {
+			if (detaching) detach(span);
+		}
+	};
+}
+
+// (67:29) 
+function create_if_block_7(ctx) {
+	let input;
+	let input_id_value;
+	let input_style_value;
+	let mounted;
+	let dispose;
+
+	return {
+		c() {
+			input = element("input");
+			attr(input, "type", "url");
+			attr(input, "id", input_id_value = "node-input-" + /*id*/ ctx[1]);
+			attr(input, "placeholder", /*placeholder*/ ctx[4]);
+			attr(input, "style", input_style_value = /*maximize*/ ctx[7] ? "width: 100%;" : "");
+		},
+		m(target, anchor) {
+			insert(target, input, anchor);
+			set_input_value(input, /*value*/ ctx[0]);
+
+			if (!mounted) {
+				dispose = [
+					listen(input, "mouseenter", /*mouseenter_handler_7*/ ctx[24]),
+					listen(input, "mouseleave", /*mouseleave_handler_7*/ ctx[25]),
+					listen(input, "input", /*input_input_handler_4*/ ctx[33])
+				];
+
+				mounted = true;
+			}
+		},
+		p(ctx, dirty) {
+			if (dirty[0] & /*id*/ 2 && input_id_value !== (input_id_value = "node-input-" + /*id*/ ctx[1])) {
+				attr(input, "id", input_id_value);
+			}
+
+			if (dirty[0] & /*placeholder*/ 16) {
+				attr(input, "placeholder", /*placeholder*/ ctx[4]);
+			}
+
+			if (dirty[0] & /*maximize*/ 128 && input_style_value !== (input_style_value = /*maximize*/ ctx[7] ? "width: 100%;" : "")) {
+				attr(input, "style", input_style_value);
+			}
+
+			if (dirty[0] & /*value*/ 1) {
+				set_input_value(input, /*value*/ ctx[0]);
+			}
+		},
+		d(detaching) {
+			if (detaching) detach(input);
+			mounted = false;
+			run_all(dispose);
+		}
+	};
+}
+
+// (65:31) 
+function create_if_block_6(ctx) {
+	let input;
+	let input_id_value;
+	let input_style_value;
+	let mounted;
+	let dispose;
+
+	return {
+		c() {
+			input = element("input");
+			attr(input, "type", "email");
+			attr(input, "id", input_id_value = "node-input-" + /*id*/ ctx[1]);
+			attr(input, "placeholder", /*placeholder*/ ctx[4]);
+			attr(input, "style", input_style_value = /*maximize*/ ctx[7] ? "width: 100%;" : "");
+		},
+		m(target, anchor) {
+			insert(target, input, anchor);
+			set_input_value(input, /*value*/ ctx[0]);
+
+			if (!mounted) {
+				dispose = [
+					listen(input, "mouseenter", /*mouseenter_handler_6*/ ctx[22]),
+					listen(input, "mouseleave", /*mouseleave_handler_6*/ ctx[23]),
+					listen(input, "input", /*input_input_handler_3*/ ctx[32])
+				];
+
+				mounted = true;
+			}
+		},
+		p(ctx, dirty) {
+			if (dirty[0] & /*id*/ 2 && input_id_value !== (input_id_value = "node-input-" + /*id*/ ctx[1])) {
+				attr(input, "id", input_id_value);
+			}
+
+			if (dirty[0] & /*placeholder*/ 16) {
+				attr(input, "placeholder", /*placeholder*/ ctx[4]);
+			}
+
+			if (dirty[0] & /*maximize*/ 128 && input_style_value !== (input_style_value = /*maximize*/ ctx[7] ? "width: 100%;" : "")) {
+				attr(input, "style", input_style_value);
+			}
+
+			if (dirty[0] & /*value*/ 1 && input.value !== /*value*/ ctx[0]) {
+				set_input_value(input, /*value*/ ctx[0]);
+			}
+		},
+		d(detaching) {
+			if (detaching) detach(input);
+			mounted = false;
+			run_all(dispose);
+		}
+	};
+}
+
+// (63:34) 
+function create_if_block_5(ctx) {
+	let input;
+	let input_id_value;
+	let input_style_value;
+	let mounted;
+	let dispose;
+
+	return {
+		c() {
+			input = element("input");
+			attr(input, "type", "password");
+			attr(input, "id", input_id_value = "node-input-" + /*id*/ ctx[1]);
+			attr(input, "placeholder", /*placeholder*/ ctx[4]);
+			attr(input, "style", input_style_value = /*maximize*/ ctx[7] ? "width: 100%;" : "");
+		},
+		m(target, anchor) {
+			insert(target, input, anchor);
+			set_input_value(input, /*value*/ ctx[0]);
+
+			if (!mounted) {
+				dispose = [
+					listen(input, "mouseenter", /*mouseenter_handler_5*/ ctx[20]),
+					listen(input, "mouseleave", /*mouseleave_handler_5*/ ctx[21]),
+					listen(input, "input", /*input_input_handler_2*/ ctx[31])
+				];
+
+				mounted = true;
+			}
+		},
+		p(ctx, dirty) {
+			if (dirty[0] & /*id*/ 2 && input_id_value !== (input_id_value = "node-input-" + /*id*/ ctx[1])) {
+				attr(input, "id", input_id_value);
+			}
+
+			if (dirty[0] & /*placeholder*/ 16) {
+				attr(input, "placeholder", /*placeholder*/ ctx[4]);
+			}
+
+			if (dirty[0] & /*maximize*/ 128 && input_style_value !== (input_style_value = /*maximize*/ ctx[7] ? "width: 100%;" : "")) {
+				attr(input, "style", input_style_value);
+			}
+
+			if (dirty[0] & /*value*/ 1 && input.value !== /*value*/ ctx[0]) {
+				set_input_value(input, /*value*/ ctx[0]);
+			}
+		},
+		d(detaching) {
+			if (detaching) detach(input);
+			mounted = false;
+			run_all(dispose);
+		}
+	};
+}
+
+// (58:34) 
+function create_if_block_3(ctx) {
+	let div;
+	let input;
+	let input_id_value;
+	let t0;
+	let label_1;
+	let t1;
+	let t2;
+	let label_1_for_value;
+	let mounted;
+	let dispose;
+	let if_block = /*icon*/ ctx[6] && create_if_block_4(ctx);
+
+	return {
+		c() {
+			div = element("div");
+			input = element("input");
+			t0 = space();
+			label_1 = element("label");
+			if (if_block) if_block.c();
+			t1 = space();
+			t2 = text(/*label*/ ctx[3]);
+			attr(input, "type", "checkbox");
+			attr(input, "id", input_id_value = "node-input-" + /*id*/ ctx[1]);
+			set_style(input, "display", "inline-block");
+			set_style(input, "width", "auto");
+			set_style(input, "vertical-align", "top");
+			set_style(input, "margin-right", "6px");
+			attr(label_1, "for", label_1_for_value = "node-input-" + /*id*/ ctx[1]);
+			set_style(label_1, "width", "auto");
+			set_style(div, "margin-top", "21px");
+			set_style(div, "margin-bottom", "16px");
+		},
+		m(target, anchor) {
+			insert(target, div, anchor);
+			append(div, input);
+			input.checked = /*value*/ ctx[0];
+			append(div, t0);
+			append(div, label_1);
+			if (if_block) if_block.m(label_1, null);
+			append(label_1, t1);
+			append(label_1, t2);
+
+			if (!mounted) {
+				dispose = [
+					listen(input, "mouseenter", /*mouseenter_handler_3*/ ctx[18]),
+					listen(input, "mouseleave", /*mouseleave_handler_3*/ ctx[19]),
+					listen(input, "change", /*input_change_handler*/ ctx[30]),
+					listen(label_1, "mouseenter", /*mouseenter_handler_4*/ ctx[16]),
+					listen(label_1, "mouseleave", /*mouseleave_handler_4*/ ctx[17])
+				];
+
+				mounted = true;
+			}
+		},
+		p(ctx, dirty) {
+			if (dirty[0] & /*id*/ 2 && input_id_value !== (input_id_value = "node-input-" + /*id*/ ctx[1])) {
+				attr(input, "id", input_id_value);
+			}
+
+			if (dirty[0] & /*value*/ 1) {
+				input.checked = /*value*/ ctx[0];
+			}
+
+			if (/*icon*/ ctx[6]) {
+				if (if_block) {
+					if_block.p(ctx, dirty);
+				} else {
+					if_block = create_if_block_4(ctx);
+					if_block.c();
+					if_block.m(label_1, t1);
+				}
+			} else if (if_block) {
+				if_block.d(1);
+				if_block = null;
+			}
+
+			if (dirty[0] & /*label*/ 8) set_data(t2, /*label*/ ctx[3]);
+
+			if (dirty[0] & /*id*/ 2 && label_1_for_value !== (label_1_for_value = "node-input-" + /*id*/ ctx[1])) {
+				attr(label_1, "for", label_1_for_value);
+			}
+		},
+		d(detaching) {
+			if (detaching) detach(div);
+			if (if_block) if_block.d();
+			mounted = false;
+			run_all(dispose);
+		}
+	};
+}
+
+// (56:32) 
+function create_if_block_2$1(ctx) {
+	let input;
+	let input_id_value;
+	let input_style_value;
+	let mounted;
+	let dispose;
+
+	return {
+		c() {
+			input = element("input");
+			attr(input, "type", "number");
+			attr(input, "id", input_id_value = "node-input-" + /*id*/ ctx[1]);
+			attr(input, "placeholder", /*placeholder*/ ctx[4]);
+			attr(input, "style", input_style_value = /*maximize*/ ctx[7] ? "width: 100%;" : "");
+		},
+		m(target, anchor) {
+			insert(target, input, anchor);
+			set_input_value(input, /*value*/ ctx[0]);
+
+			if (!mounted) {
+				dispose = [
+					listen(input, "mouseenter", /*mouseenter_handler_2*/ ctx[14]),
+					listen(input, "mouseleave", /*mouseleave_handler_2*/ ctx[15]),
+					listen(input, "input", /*input_input_handler_1*/ ctx[29])
+				];
+
+				mounted = true;
+			}
+		},
+		p(ctx, dirty) {
+			if (dirty[0] & /*id*/ 2 && input_id_value !== (input_id_value = "node-input-" + /*id*/ ctx[1])) {
+				attr(input, "id", input_id_value);
+			}
+
+			if (dirty[0] & /*placeholder*/ 16) {
+				attr(input, "placeholder", /*placeholder*/ ctx[4]);
+			}
+
+			if (dirty[0] & /*maximize*/ 128 && input_style_value !== (input_style_value = /*maximize*/ ctx[7] ? "width: 100%;" : "")) {
+				attr(input, "style", input_style_value);
+			}
+
+			if (dirty[0] & /*value*/ 1 && to_number(input.value) !== /*value*/ ctx[0]) {
+				set_input_value(input, /*value*/ ctx[0]);
+			}
+		},
+		d(detaching) {
+			if (detaching) detach(input);
+			mounted = false;
+			run_all(dispose);
+		}
+	};
+}
+
+// (54:4) {#if type === 'text'}
+function create_if_block_1$3(ctx) {
+	let input;
+	let input_id_value;
+	let input_style_value;
+	let mounted;
+	let dispose;
+
+	return {
+		c() {
+			input = element("input");
+			attr(input, "type", "text");
+			attr(input, "id", input_id_value = "node-input-" + /*id*/ ctx[1]);
+			attr(input, "placeholder", /*placeholder*/ ctx[4]);
+			attr(input, "style", input_style_value = /*maximize*/ ctx[7] ? "width: 100%;" : "");
+		},
+		m(target, anchor) {
+			insert(target, input, anchor);
+			set_input_value(input, /*value*/ ctx[0]);
+
+			if (!mounted) {
+				dispose = [
+					listen(input, "mouseenter", /*mouseenter_handler_1*/ ctx[12]),
+					listen(input, "mouseleave", /*mouseleave_handler_1*/ ctx[13]),
+					listen(input, "input", /*input_input_handler*/ ctx[28])
+				];
+
+				mounted = true;
+			}
+		},
+		p(ctx, dirty) {
+			if (dirty[0] & /*id*/ 2 && input_id_value !== (input_id_value = "node-input-" + /*id*/ ctx[1])) {
+				attr(input, "id", input_id_value);
+			}
+
+			if (dirty[0] & /*placeholder*/ 16) {
+				attr(input, "placeholder", /*placeholder*/ ctx[4]);
+			}
+
+			if (dirty[0] & /*maximize*/ 128 && input_style_value !== (input_style_value = /*maximize*/ ctx[7] ? "width: 100%;" : "")) {
+				attr(input, "style", input_style_value);
+			}
+
+			if (dirty[0] & /*value*/ 1 && input.value !== /*value*/ ctx[0]) {
+				set_input_value(input, /*value*/ ctx[0]);
+			}
+		},
+		d(detaching) {
+			if (detaching) detach(input);
+			mounted = false;
+			run_all(dispose);
+		}
+	};
+}
+
+// (61:89) {#if icon}
+function create_if_block_4(ctx) {
+	let i;
+	let i_class_value;
+
+	return {
+		c() {
+			i = element("i");
+			attr(i, "class", i_class_value = "fa fa-" + /*icon*/ ctx[6]);
+		},
+		m(target, anchor) {
+			insert(target, i, anchor);
+		},
+		p(ctx, dirty) {
+			if (dirty[0] & /*icon*/ 64 && i_class_value !== (i_class_value = "fa fa-" + /*icon*/ ctx[6])) {
+				attr(i, "class", i_class_value);
+			}
+		},
+		d(detaching) {
+			if (detaching) detach(i);
+		}
+	};
+}
+
+function create_fragment$4(ctx) {
+	let if_block_anchor;
+
+	function select_block_type(ctx, dirty) {
+		if (!/*updateNode*/ ctx[8] || /*prop*/ ctx[5]) return create_if_block$3;
+		return create_else_block_1$1;
+	}
+
+	let current_block_type = select_block_type(ctx);
+	let if_block = current_block_type(ctx);
+
+	return {
+		c() {
+			if_block.c();
+			if_block_anchor = empty();
+		},
+		m(target, anchor) {
+			if_block.m(target, anchor);
+			insert(target, if_block_anchor, anchor);
+		},
+		p(ctx, dirty) {
+			if (current_block_type === (current_block_type = select_block_type(ctx)) && if_block) {
+				if_block.p(ctx, dirty);
+			} else {
+				if_block.d(1);
+				if_block = current_block_type(ctx);
+
+				if (if_block) {
+					if_block.c();
+					if_block.m(if_block_anchor.parentNode, if_block_anchor);
+				}
+			}
+		},
+		i: noop,
+		o: noop,
+		d(detaching) {
+			if_block.d(detaching);
+			if (detaching) detach(if_block_anchor);
+		}
+	};
+}
+
+function instance$4($$self, $$props, $$invalidate) {
+	let { node } = $$props,
+		{ prop } = $$props,
+		{ value } = $$props,
+		{ type } = $$props,
+		{ icon } = $$props,
+		{ credentials = false } = $$props,
+		{ label } = $$props,
+		{ placeholder } = $$props,
+		{ maximize } = $$props,
+		{ id } = $$props;
+
+	if (!id) {
+		if (prop) {
+			id = prop;
+		} else {
+			id = Date.now() + Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
+		}
+	}
+
+	let defaults;
+
+	if (!node) {
+		defaults = {};
+	} else {
+		defaults = credentials ? node._def.credentials : node._def.defaults;
+	}
+
+	const dispatch = createEventDispatcher();
+	const updateNode = typeof node !== "undefined";
+	value = updateNode && node[prop] || value;
+	let init = true;
+	label = label || defaults[prop] && defaults[prop].label || prop;
+	placeholder = placeholder || defaults.placeholder || "";
+
+	if (!type) {
+		let testValue = defaults[prop] ? defaults[prop].value : value;
+
+		if (typeof testValue === "number") {
+			type = "number";
+		} else if (typeof testValue === "boolean") {
+			type = "checkbox";
+		} else {
+			type = "text";
+		}
+	}
+
+	function mouseenter_handler_1(event) {
+		bubble($$self, event);
+	}
+
+	function mouseleave_handler_1(event) {
+		bubble($$self, event);
+	}
+
+	function mouseenter_handler_2(event) {
+		bubble($$self, event);
+	}
+
+	function mouseleave_handler_2(event) {
+		bubble($$self, event);
+	}
+
+	function mouseenter_handler_4(event) {
+		bubble($$self, event);
+	}
+
+	function mouseleave_handler_4(event) {
+		bubble($$self, event);
+	}
+
+	function mouseenter_handler_3(event) {
+		bubble($$self, event);
+	}
+
+	function mouseleave_handler_3(event) {
+		bubble($$self, event);
+	}
+
+	function mouseenter_handler_5(event) {
+		bubble($$self, event);
+	}
+
+	function mouseleave_handler_5(event) {
+		bubble($$self, event);
+	}
+
+	function mouseenter_handler_6(event) {
+		bubble($$self, event);
+	}
+
+	function mouseleave_handler_6(event) {
+		bubble($$self, event);
+	}
+
+	function mouseenter_handler_7(event) {
+		bubble($$self, event);
+	}
+
+	function mouseleave_handler_7(event) {
+		bubble($$self, event);
+	}
+
+	function mouseenter_handler(event) {
+		bubble($$self, event);
+	}
+
+	function mouseleave_handler(event) {
+		bubble($$self, event);
+	}
+
+	function input_input_handler() {
+		value = this.value;
+		$$invalidate(0, value);
+	}
+
+	function input_input_handler_1() {
+		value = to_number(this.value);
+		$$invalidate(0, value);
+	}
+
+	function input_change_handler() {
+		value = this.checked;
+		$$invalidate(0, value);
+	}
+
+	function input_input_handler_2() {
+		value = this.value;
+		$$invalidate(0, value);
+	}
+
+	function input_input_handler_3() {
+		value = this.value;
+		$$invalidate(0, value);
+	}
+
+	function input_input_handler_4() {
+		value = this.value;
+		$$invalidate(0, value);
+	}
+
+	$$self.$$set = $$props => {
+		if ("node" in $$props) $$invalidate(9, node = $$props.node);
+		if ("prop" in $$props) $$invalidate(5, prop = $$props.prop);
+		if ("value" in $$props) $$invalidate(0, value = $$props.value);
+		if ("type" in $$props) $$invalidate(2, type = $$props.type);
+		if ("icon" in $$props) $$invalidate(6, icon = $$props.icon);
+		if ("credentials" in $$props) $$invalidate(10, credentials = $$props.credentials);
+		if ("label" in $$props) $$invalidate(3, label = $$props.label);
+		if ("placeholder" in $$props) $$invalidate(4, placeholder = $$props.placeholder);
+		if ("maximize" in $$props) $$invalidate(7, maximize = $$props.maximize);
+		if ("id" in $$props) $$invalidate(1, id = $$props.id);
+	};
+
+	$$self.$$.update = () => {
+		if ($$self.$$.dirty[0] & /*prop, value, init, id*/ 2083) {
+			{
+				if (updateNode) {
+					$$invalidate(9, node[prop] = value, node);
+				}
+
+				if (!init) {
+					dispatch("change", { id, value });
+				}
+
+				$$invalidate(11, init = false);
+			}
+		}
+	};
+
+	return [
+		value,
+		id,
+		type,
+		label,
+		placeholder,
+		prop,
+		icon,
+		maximize,
+		updateNode,
+		node,
+		credentials,
+		init,
+		mouseenter_handler_1,
+		mouseleave_handler_1,
+		mouseenter_handler_2,
+		mouseleave_handler_2,
+		mouseenter_handler_4,
+		mouseleave_handler_4,
+		mouseenter_handler_3,
+		mouseleave_handler_3,
+		mouseenter_handler_5,
+		mouseleave_handler_5,
+		mouseenter_handler_6,
+		mouseleave_handler_6,
+		mouseenter_handler_7,
+		mouseleave_handler_7,
+		mouseenter_handler,
+		mouseleave_handler,
+		input_input_handler,
+		input_input_handler_1,
+		input_change_handler,
+		input_input_handler_2,
+		input_input_handler_3,
+		input_input_handler_4
+	];
+}
+
+class PlainInput extends SvelteComponent {
+	constructor(options) {
+		super();
+
+		init(
+			this,
+			options,
+			instance$4,
+			create_fragment$4,
+			safe_not_equal,
+			{
+				node: 9,
+				prop: 5,
+				value: 0,
+				type: 2,
+				icon: 6,
+				credentials: 10,
+				label: 3,
+				placeholder: 4,
+				maximize: 7,
+				id: 1
+			},
+			[-1, -1]
+		);
+	}
+}
+
+/* node_modules/svelte-integration-red/components/ConfigNodeInput.svelte generated by Svelte v3.35.0 */
+
+function get_each_context$1(ctx, list, i) {
+	const child_ctx = ctx.slice();
+	child_ctx[1] = list[i].id;
+	child_ctx[0] = list[i].label;
+	return child_ctx;
+}
+
+// (83:0) {:else}
+function create_else_block$1(ctx) {
+	let span;
+
+	return {
+		c() {
+			span = element("span");
+			span.textContent = "Error: No property name given.";
+			set_style(span, "width", "100%");
+		},
+		m(target, anchor) {
+			insert(target, span, anchor);
+		},
+		p: noop,
+		d(detaching) {
+			if (detaching) detach(span);
+		}
+	};
+}
+
+// (71:0) {#if prop}
+function create_if_block$2(ctx) {
+	let label_1;
+	let t0;
+	let t1;
+	let label_1_for_value;
+	let t2;
+	let div1;
+	let div0;
+	let select;
+	let each_blocks = [];
+	let each_1_lookup = new Map();
+	let select_id_value;
+	let select_placeholder_value;
+	let t3;
+	let a;
+	let i;
+	let a_id_value;
+	let mounted;
+	let dispose;
+	let if_block = /*icon*/ ctx[3] && create_if_block_1$2(ctx);
+	let each_value = /*configNodes*/ ctx[5];
+	const get_key = ctx => /*id*/ ctx[1];
+
+	for (let i = 0; i < each_value.length; i += 1) {
+		let child_ctx = get_each_context$1(ctx, each_value, i);
+		let key = get_key(child_ctx);
+		each_1_lookup.set(key, each_blocks[i] = create_each_block$1(key, child_ctx));
+	}
+
+	return {
+		c() {
+			label_1 = element("label");
+			if (if_block) if_block.c();
+			t0 = space();
+			t1 = text(/*label*/ ctx[0]);
+			t2 = space();
+			div1 = element("div");
+			div0 = element("div");
+			select = element("select");
+
+			for (let i = 0; i < each_blocks.length; i += 1) {
+				each_blocks[i].c();
+			}
+
+			t3 = space();
+			a = element("a");
+			i = element("i");
+			attr(label_1, "for", label_1_for_value = "node-input-" + /*prop*/ ctx[2]);
+			set_style(select, "width", "100%");
+			attr(select, "id", select_id_value = "node-input-" + /*prop*/ ctx[2]);
+			attr(select, "placeholder", select_placeholder_value = /*defaults*/ ctx[6][/*prop*/ ctx[2]].label);
+			if (/*selectedNode*/ ctx[4] === void 0) add_render_callback(() => /*select_change_handler*/ ctx[12].call(select));
+			set_style(div0, "position", "absolute");
+			set_style(div0, "left", "0px");
+			set_style(div0, "right", "40px");
+			attr(i, "class", "fa fa-pencil");
+			attr(a, "id", a_id_value = "node-input-lookup-" + /*prop*/ ctx[2]);
+			attr(a, "class", "red-ui-button");
+			set_style(a, "position", "absolute");
+			set_style(a, "right", "0px");
+			set_style(a, "top", "0px");
+			set_style(div1, "display", "inline-block");
+			set_style(div1, "position", "relative");
+			set_style(div1, "width", "70%");
+			set_style(div1, "height", "20px");
+		},
+		m(target, anchor) {
+			insert(target, label_1, anchor);
+			if (if_block) if_block.m(label_1, null);
+			append(label_1, t0);
+			append(label_1, t1);
+			insert(target, t2, anchor);
+			insert(target, div1, anchor);
+			append(div1, div0);
+			append(div0, select);
+
+			for (let i = 0; i < each_blocks.length; i += 1) {
+				each_blocks[i].m(select, null);
+			}
+
+			select_option(select, /*selectedNode*/ ctx[4]);
+			append(div1, t3);
+			append(div1, a);
+			append(a, i);
+
+			if (!mounted) {
+				dispose = [
+					listen(select, "change", /*select_change_handler*/ ctx[12]),
+					listen(a, "click", /*editConfigNode*/ ctx[7]),
+					listen(div1, "mouseenter", /*mouseenter_handler*/ ctx[10]),
+					listen(div1, "mouseleave", /*mouseleave_handler*/ ctx[11])
+				];
+
+				mounted = true;
+			}
+		},
+		p(ctx, dirty) {
+			if (/*icon*/ ctx[3]) {
+				if (if_block) {
+					if_block.p(ctx, dirty);
+				} else {
+					if_block = create_if_block_1$2(ctx);
+					if_block.c();
+					if_block.m(label_1, t0);
+				}
+			} else if (if_block) {
+				if_block.d(1);
+				if_block = null;
+			}
+
+			if (dirty & /*label*/ 1) set_data(t1, /*label*/ ctx[0]);
+
+			if (dirty & /*prop*/ 4 && label_1_for_value !== (label_1_for_value = "node-input-" + /*prop*/ ctx[2])) {
+				attr(label_1, "for", label_1_for_value);
+			}
+
+			if (dirty & /*configNodes*/ 32) {
+				each_value = /*configNodes*/ ctx[5];
+				each_blocks = update_keyed_each(each_blocks, dirty, get_key, 1, ctx, each_value, each_1_lookup, select, destroy_block, create_each_block$1, null, get_each_context$1);
+			}
+
+			if (dirty & /*prop*/ 4 && select_id_value !== (select_id_value = "node-input-" + /*prop*/ ctx[2])) {
+				attr(select, "id", select_id_value);
+			}
+
+			if (dirty & /*prop*/ 4 && select_placeholder_value !== (select_placeholder_value = /*defaults*/ ctx[6][/*prop*/ ctx[2]].label)) {
+				attr(select, "placeholder", select_placeholder_value);
+			}
+
+			if (dirty & /*selectedNode, configNodes*/ 48) {
+				select_option(select, /*selectedNode*/ ctx[4]);
+			}
+
+			if (dirty & /*prop*/ 4 && a_id_value !== (a_id_value = "node-input-lookup-" + /*prop*/ ctx[2])) {
+				attr(a, "id", a_id_value);
+			}
+		},
+		d(detaching) {
+			if (detaching) detach(label_1);
+			if (if_block) if_block.d();
+			if (detaching) detach(t2);
+			if (detaching) detach(div1);
+
+			for (let i = 0; i < each_blocks.length; i += 1) {
+				each_blocks[i].d();
+			}
+
+			mounted = false;
+			run_all(dispose);
+		}
+	};
+}
+
+// (72:35) {#if icon}
+function create_if_block_1$2(ctx) {
+	let i;
+	let i_class_value;
+
+	return {
+		c() {
+			i = element("i");
+			attr(i, "class", i_class_value = "fa fa-" + /*icon*/ ctx[3]);
+		},
+		m(target, anchor) {
+			insert(target, i, anchor);
+		},
+		p(ctx, dirty) {
+			if (dirty & /*icon*/ 8 && i_class_value !== (i_class_value = "fa fa-" + /*icon*/ ctx[3])) {
+				attr(i, "class", i_class_value);
+			}
+		},
+		d(detaching) {
+			if (detaching) detach(i);
+		}
+	};
+}
+
+// (76:16) {#each configNodes as { id, label }
+function create_each_block$1(key_1, ctx) {
+	let option;
+	let t_value = /*label*/ ctx[0] + "";
+	let t;
+	let option_value_value;
+
+	return {
+		key: key_1,
+		first: null,
+		c() {
+			option = element("option");
+			t = text(t_value);
+			option.__value = option_value_value = /*id*/ ctx[1];
+			option.value = option.__value;
+			this.first = option;
+		},
+		m(target, anchor) {
+			insert(target, option, anchor);
+			append(option, t);
+		},
+		p(new_ctx, dirty) {
+			ctx = new_ctx;
+			if (dirty & /*configNodes*/ 32 && t_value !== (t_value = /*label*/ ctx[0] + "")) set_data(t, t_value);
+
+			if (dirty & /*configNodes*/ 32 && option_value_value !== (option_value_value = /*id*/ ctx[1])) {
+				option.__value = option_value_value;
+				option.value = option.__value;
+			}
+		},
+		d(detaching) {
+			if (detaching) detach(option);
+		}
+	};
+}
+
+function create_fragment$3(ctx) {
+	let if_block_anchor;
+
+	function select_block_type(ctx, dirty) {
+		if (/*prop*/ ctx[2]) return create_if_block$2;
+		return create_else_block$1;
+	}
+
+	let current_block_type = select_block_type(ctx);
+	let if_block = current_block_type(ctx);
+
+	return {
+		c() {
+			if_block.c();
+			if_block_anchor = empty();
+		},
+		m(target, anchor) {
+			if_block.m(target, anchor);
+			insert(target, if_block_anchor, anchor);
+		},
+		p(ctx, [dirty]) {
+			if (current_block_type === (current_block_type = select_block_type(ctx)) && if_block) {
+				if_block.p(ctx, dirty);
+			} else {
+				if_block.d(1);
+				if_block = current_block_type(ctx);
+
+				if (if_block) {
+					if_block.c();
+					if_block.m(if_block_anchor.parentNode, if_block_anchor);
+				}
+			}
+		},
+		i: noop,
+		o: noop,
+		d(detaching) {
+			if_block.d(detaching);
+			if (detaching) detach(if_block_anchor);
+		}
+	};
+}
+
+function instance$3($$self, $$props, $$invalidate) {
+	let { node } = $$props,
+		{ prop } = $$props,
+		{ icon } = $$props,
+		{ label } = $$props,
+		{ id } = $$props;
+
+	if (!id) {
+		id = prop || Date.now() + Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
+	}
+
+	const dispatch = createEventDispatcher();
+	let defaults = node._def.defaults;
+	label = label || defaults[prop] && defaults[prop].label || prop;
+	let configNodes = [];
+	let previouslySelectedNode = node[prop] || "_ADD_";
+	let selectedNode = node[prop] || "_ADD_";
+
+	function updateConfigNodes() {
+		$$invalidate(5, configNodes = []);
+		const type = defaults[prop].type;
+		const node_def = RED.nodes.getType(type);
+
+		RED.nodes.eachConfig(function (config) {
+			if (config.type === type) {
+				let label = "";
+
+				if (typeof node_def.label === "function") {
+					label = node_def.label.call(config);
+				} else {
+					label = node_def.label;
+				}
+
+				configNodes.push({ id: config.id, label });
+			}
+		});
+
+		$$invalidate(5, configNodes = [...configNodes, { id: "_ADD_", label: `Add new ${type}...` }]);
+	}
+
+	onMount(() => {
+		updateConfigNodes();
+
+		RED.events.on("nodes:add", e => {
+			if (e.type === defaults[prop].type) {
+				updateConfigNodes();
+				$$invalidate(4, selectedNode = e.id);
+			}
+		});
+
+		RED.events.on("nodes:change", e => {
+			if (e.type === defaults[prop].type) {
+				updateConfigNodes();
+			}
+		});
+	});
+
+	function editConfigNode() {
+		// The prefix is omitted so the select gets updated by us and not by Node-RED
+		RED.editor.editConfig(prop, defaults[prop].type, selectedNode); /*, 'node-input' */
+	}
+
+	function mouseenter_handler(event) {
+		bubble($$self, event);
+	}
+
+	function mouseleave_handler(event) {
+		bubble($$self, event);
+	}
+
+	function select_change_handler() {
+		selectedNode = select_value(this);
+		$$invalidate(4, selectedNode);
+		$$invalidate(5, configNodes);
+	}
+
+	$$self.$$set = $$props => {
+		if ("node" in $$props) $$invalidate(8, node = $$props.node);
+		if ("prop" in $$props) $$invalidate(2, prop = $$props.prop);
+		if ("icon" in $$props) $$invalidate(3, icon = $$props.icon);
+		if ("label" in $$props) $$invalidate(0, label = $$props.label);
+		if ("id" in $$props) $$invalidate(1, id = $$props.id);
+	};
+
+	$$self.$$.update = () => {
+		if ($$self.$$.dirty & /*selectedNode, previouslySelectedNode, prop*/ 532) {
+			{
+				if (selectedNode !== previouslySelectedNode) {
+					$$invalidate(8, node[prop] = selectedNode, node);
+
+					dispatch("change", {
+						before: previouslySelectedNode,
+						after: selectedNode
+					});
+
+					$$invalidate(9, previouslySelectedNode = selectedNode);
+				}
+			}
+		}
+	};
+
+	return [
+		label,
+		id,
+		prop,
+		icon,
+		selectedNode,
+		configNodes,
+		defaults,
+		editConfigNode,
+		node,
+		previouslySelectedNode,
+		mouseenter_handler,
+		mouseleave_handler,
+		select_change_handler
+	];
+}
+
+class ConfigNodeInput extends SvelteComponent {
+	constructor(options) {
+		super();
+
+		init(this, options, instance$3, create_fragment$3, safe_not_equal, {
+			node: 8,
+			prop: 2,
+			icon: 3,
+			label: 0,
+			id: 1
+		});
+	}
+}
+
+/* node_modules/svelte-integration-red/components/Input.svelte generated by Svelte v3.35.0 */
+
+function create_else_block_1(ctx) {
+	let row;
+	let current;
+
+	row = new Row({
+			props: {
+				style: /*maximize*/ ctx[8]
+				? "display: flex; align-items: baseline;"
+				: "",
+				$$slots: { default: [create_default_slot$1] },
+				$$scope: { ctx }
+			}
+		});
+
+	return {
+		c() {
+			create_component(row.$$.fragment);
+		},
+		m(target, anchor) {
+			mount_component(row, target, anchor);
+			current = true;
+		},
+		p(ctx, dirty) {
+			const row_changes = {};
+
+			if (dirty[0] & /*maximize*/ 256) row_changes.style = /*maximize*/ ctx[8]
+			? "display: flex; align-items: baseline;"
+			: "";
+
+			if (dirty[0] & /*icon, node, prop, label, type, credentials, id, value, placeholder, maximize*/ 1919 | dirty[1] & /*$$scope*/ 32768) {
+				row_changes.$$scope = { dirty, ctx };
+			}
+
+			row.$set(row_changes);
+		},
+		i(local) {
+			if (current) return;
+			transition_in(row.$$.fragment, local);
+			current = true;
+		},
+		o(local) {
+			transition_out(row.$$.fragment, local);
+			current = false;
+		},
+		d(detaching) {
+			destroy_component(row, detaching);
+		}
+	};
+}
+
+// (21:0) {#if inline}
+function create_if_block$1(ctx) {
+	let current_block_type_index;
+	let if_block;
+	let if_block_anchor;
+	let current;
+	const if_block_creators = [create_if_block_1$1, create_else_block];
+	const if_blocks = [];
+
+	function select_block_type_1(ctx, dirty) {
+		if (/*type*/ ctx[1] === "config") return 0;
+		return 1;
+	}
+
+	current_block_type_index = select_block_type_1(ctx);
+	if_block = if_blocks[current_block_type_index] = if_block_creators[current_block_type_index](ctx);
+
+	return {
+		c() {
+			if_block.c();
+			if_block_anchor = empty();
+		},
+		m(target, anchor) {
+			if_blocks[current_block_type_index].m(target, anchor);
+			insert(target, if_block_anchor, anchor);
+			current = true;
+		},
+		p(ctx, dirty) {
+			let previous_block_index = current_block_type_index;
+			current_block_type_index = select_block_type_1(ctx);
+
+			if (current_block_type_index === previous_block_index) {
+				if_blocks[current_block_type_index].p(ctx, dirty);
+			} else {
+				group_outros();
+
+				transition_out(if_blocks[previous_block_index], 1, 1, () => {
+					if_blocks[previous_block_index] = null;
+				});
+
+				check_outros();
+				if_block = if_blocks[current_block_type_index];
+
+				if (!if_block) {
+					if_block = if_blocks[current_block_type_index] = if_block_creators[current_block_type_index](ctx);
+					if_block.c();
+				} else {
+					if_block.p(ctx, dirty);
+				}
+
+				transition_in(if_block, 1);
+				if_block.m(if_block_anchor.parentNode, if_block_anchor);
+			}
+		},
+		i(local) {
+			if (current) return;
+			transition_in(if_block);
+			current = true;
+		},
+		o(local) {
+			transition_out(if_block);
+			current = false;
+		},
+		d(detaching) {
+			if_blocks[current_block_type_index].d(detaching);
+			if (detaching) detach(if_block_anchor);
+		}
+	};
+}
+
+// (31:8) {:else}
+function create_else_block_2(ctx) {
+	let plaininput;
+	let updating_node;
+	let updating_prop;
+	let updating_value;
+	let updating_type;
+	let updating_icon;
+	let updating_label;
+	let updating_placeholder;
+	let updating_maximize;
+	let current;
+
+	function plaininput_node_binding_1(value) {
+		/*plaininput_node_binding_1*/ ctx[35](value);
+	}
+
+	function plaininput_prop_binding_1(value) {
+		/*plaininput_prop_binding_1*/ ctx[36](value);
+	}
+
+	function plaininput_value_binding_1(value) {
+		/*plaininput_value_binding_1*/ ctx[37](value);
+	}
+
+	function plaininput_type_binding_1(value) {
+		/*plaininput_type_binding_1*/ ctx[38](value);
+	}
+
+	function plaininput_icon_binding_1(value) {
+		/*plaininput_icon_binding_1*/ ctx[39](value);
+	}
+
+	function plaininput_label_binding_1(value) {
+		/*plaininput_label_binding_1*/ ctx[40](value);
+	}
+
+	function plaininput_placeholder_binding_1(value) {
+		/*plaininput_placeholder_binding_1*/ ctx[41](value);
+	}
+
+	function plaininput_maximize_binding_1(value) {
+		/*plaininput_maximize_binding_1*/ ctx[42](value);
+	}
+
+	let plaininput_props = {
+		credentials: /*credentials*/ ctx[9],
+		id: /*id*/ ctx[10]
+	};
+
+	if (/*node*/ ctx[2] !== void 0) {
+		plaininput_props.node = /*node*/ ctx[2];
+	}
+
+	if (/*prop*/ ctx[3] !== void 0) {
+		plaininput_props.prop = /*prop*/ ctx[3];
+	}
+
+	if (/*value*/ ctx[0] !== void 0) {
+		plaininput_props.value = /*value*/ ctx[0];
+	}
+
+	if (/*type*/ ctx[1] !== void 0) {
+		plaininput_props.type = /*type*/ ctx[1];
+	}
+
+	if (/*icon*/ ctx[4] !== void 0) {
+		plaininput_props.icon = /*icon*/ ctx[4];
+	}
+
+	if (/*label*/ ctx[5] !== void 0) {
+		plaininput_props.label = /*label*/ ctx[5];
+	}
+
+	if (/*placeholder*/ ctx[6] !== void 0) {
+		plaininput_props.placeholder = /*placeholder*/ ctx[6];
+	}
+
+	if (/*maximize*/ ctx[8] !== void 0) {
+		plaininput_props.maximize = /*maximize*/ ctx[8];
+	}
+
+	plaininput = new PlainInput({ props: plaininput_props });
+	binding_callbacks.push(() => bind(plaininput, "node", plaininput_node_binding_1));
+	binding_callbacks.push(() => bind(plaininput, "prop", plaininput_prop_binding_1));
+	binding_callbacks.push(() => bind(plaininput, "value", plaininput_value_binding_1));
+	binding_callbacks.push(() => bind(plaininput, "type", plaininput_type_binding_1));
+	binding_callbacks.push(() => bind(plaininput, "icon", plaininput_icon_binding_1));
+	binding_callbacks.push(() => bind(plaininput, "label", plaininput_label_binding_1));
+	binding_callbacks.push(() => bind(plaininput, "placeholder", plaininput_placeholder_binding_1));
+	binding_callbacks.push(() => bind(plaininput, "maximize", plaininput_maximize_binding_1));
+	plaininput.$on("change", /*change_handler_3*/ ctx[43]);
+	plaininput.$on("mouseenter", /*mouseenter_handler_3*/ ctx[44]);
+	plaininput.$on("mouseleave", /*mouseleave_handler_3*/ ctx[45]);
+
+	return {
+		c() {
+			create_component(plaininput.$$.fragment);
+		},
+		m(target, anchor) {
+			mount_component(plaininput, target, anchor);
+			current = true;
+		},
+		p(ctx, dirty) {
+			const plaininput_changes = {};
+			if (dirty[0] & /*credentials*/ 512) plaininput_changes.credentials = /*credentials*/ ctx[9];
+			if (dirty[0] & /*id*/ 1024) plaininput_changes.id = /*id*/ ctx[10];
+
+			if (!updating_node && dirty[0] & /*node*/ 4) {
+				updating_node = true;
+				plaininput_changes.node = /*node*/ ctx[2];
+				add_flush_callback(() => updating_node = false);
+			}
+
+			if (!updating_prop && dirty[0] & /*prop*/ 8) {
+				updating_prop = true;
+				plaininput_changes.prop = /*prop*/ ctx[3];
+				add_flush_callback(() => updating_prop = false);
+			}
+
+			if (!updating_value && dirty[0] & /*value*/ 1) {
+				updating_value = true;
+				plaininput_changes.value = /*value*/ ctx[0];
+				add_flush_callback(() => updating_value = false);
+			}
+
+			if (!updating_type && dirty[0] & /*type*/ 2) {
+				updating_type = true;
+				plaininput_changes.type = /*type*/ ctx[1];
+				add_flush_callback(() => updating_type = false);
+			}
+
+			if (!updating_icon && dirty[0] & /*icon*/ 16) {
+				updating_icon = true;
+				plaininput_changes.icon = /*icon*/ ctx[4];
+				add_flush_callback(() => updating_icon = false);
+			}
+
+			if (!updating_label && dirty[0] & /*label*/ 32) {
+				updating_label = true;
+				plaininput_changes.label = /*label*/ ctx[5];
+				add_flush_callback(() => updating_label = false);
+			}
+
+			if (!updating_placeholder && dirty[0] & /*placeholder*/ 64) {
+				updating_placeholder = true;
+				plaininput_changes.placeholder = /*placeholder*/ ctx[6];
+				add_flush_callback(() => updating_placeholder = false);
+			}
+
+			if (!updating_maximize && dirty[0] & /*maximize*/ 256) {
+				updating_maximize = true;
+				plaininput_changes.maximize = /*maximize*/ ctx[8];
+				add_flush_callback(() => updating_maximize = false);
+			}
+
+			plaininput.$set(plaininput_changes);
+		},
+		i(local) {
+			if (current) return;
+			transition_in(plaininput.$$.fragment, local);
+			current = true;
+		},
+		o(local) {
+			transition_out(plaininput.$$.fragment, local);
+			current = false;
+		},
+		d(detaching) {
+			destroy_component(plaininput, detaching);
+		}
+	};
+}
+
+// (29:8) {#if type === 'config'}
+function create_if_block_2(ctx) {
+	let confignodeinput;
+	let updating_node;
+	let updating_prop;
+	let updating_label;
+	let current;
+
+	function confignodeinput_node_binding_1(value) {
+		/*confignodeinput_node_binding_1*/ ctx[29](value);
+	}
+
+	function confignodeinput_prop_binding_1(value) {
+		/*confignodeinput_prop_binding_1*/ ctx[30](value);
+	}
+
+	function confignodeinput_label_binding_1(value) {
+		/*confignodeinput_label_binding_1*/ ctx[31](value);
+	}
+
+	let confignodeinput_props = { icon: /*icon*/ ctx[4] };
+
+	if (/*node*/ ctx[2] !== void 0) {
+		confignodeinput_props.node = /*node*/ ctx[2];
+	}
+
+	if (/*prop*/ ctx[3] !== void 0) {
+		confignodeinput_props.prop = /*prop*/ ctx[3];
+	}
+
+	if (/*label*/ ctx[5] !== void 0) {
+		confignodeinput_props.label = /*label*/ ctx[5];
+	}
+
+	confignodeinput = new ConfigNodeInput({ props: confignodeinput_props });
+	binding_callbacks.push(() => bind(confignodeinput, "node", confignodeinput_node_binding_1));
+	binding_callbacks.push(() => bind(confignodeinput, "prop", confignodeinput_prop_binding_1));
+	binding_callbacks.push(() => bind(confignodeinput, "label", confignodeinput_label_binding_1));
+	confignodeinput.$on("change", /*change_handler_2*/ ctx[32]);
+	confignodeinput.$on("mouseenter", /*mouseenter_handler_2*/ ctx[33]);
+	confignodeinput.$on("mouseleave", /*mouseleave_handler_2*/ ctx[34]);
+
+	return {
+		c() {
+			create_component(confignodeinput.$$.fragment);
+		},
+		m(target, anchor) {
+			mount_component(confignodeinput, target, anchor);
+			current = true;
+		},
+		p(ctx, dirty) {
+			const confignodeinput_changes = {};
+			if (dirty[0] & /*icon*/ 16) confignodeinput_changes.icon = /*icon*/ ctx[4];
+
+			if (!updating_node && dirty[0] & /*node*/ 4) {
+				updating_node = true;
+				confignodeinput_changes.node = /*node*/ ctx[2];
+				add_flush_callback(() => updating_node = false);
+			}
+
+			if (!updating_prop && dirty[0] & /*prop*/ 8) {
+				updating_prop = true;
+				confignodeinput_changes.prop = /*prop*/ ctx[3];
+				add_flush_callback(() => updating_prop = false);
+			}
+
+			if (!updating_label && dirty[0] & /*label*/ 32) {
+				updating_label = true;
+				confignodeinput_changes.label = /*label*/ ctx[5];
+				add_flush_callback(() => updating_label = false);
+			}
+
+			confignodeinput.$set(confignodeinput_changes);
+		},
+		i(local) {
+			if (current) return;
+			transition_in(confignodeinput.$$.fragment, local);
+			current = true;
+		},
+		o(local) {
+			transition_out(confignodeinput.$$.fragment, local);
+			current = false;
+		},
+		d(detaching) {
+			destroy_component(confignodeinput, detaching);
+		}
+	};
+}
+
+// (28:4) <Row style="{maximize? 'display: flex; align-items: baseline;' : ''}">
+function create_default_slot$1(ctx) {
+	let current_block_type_index;
+	let if_block;
+	let if_block_anchor;
+	let current;
+	const if_block_creators = [create_if_block_2, create_else_block_2];
+	const if_blocks = [];
+
+	function select_block_type_2(ctx, dirty) {
+		if (/*type*/ ctx[1] === "config") return 0;
+		return 1;
+	}
+
+	current_block_type_index = select_block_type_2(ctx);
+	if_block = if_blocks[current_block_type_index] = if_block_creators[current_block_type_index](ctx);
+
+	return {
+		c() {
+			if_block.c();
+			if_block_anchor = empty();
+		},
+		m(target, anchor) {
+			if_blocks[current_block_type_index].m(target, anchor);
+			insert(target, if_block_anchor, anchor);
+			current = true;
+		},
+		p(ctx, dirty) {
+			let previous_block_index = current_block_type_index;
+			current_block_type_index = select_block_type_2(ctx);
+
+			if (current_block_type_index === previous_block_index) {
+				if_blocks[current_block_type_index].p(ctx, dirty);
+			} else {
+				group_outros();
+
+				transition_out(if_blocks[previous_block_index], 1, 1, () => {
+					if_blocks[previous_block_index] = null;
+				});
+
+				check_outros();
+				if_block = if_blocks[current_block_type_index];
+
+				if (!if_block) {
+					if_block = if_blocks[current_block_type_index] = if_block_creators[current_block_type_index](ctx);
+					if_block.c();
+				} else {
+					if_block.p(ctx, dirty);
+				}
+
+				transition_in(if_block, 1);
+				if_block.m(if_block_anchor.parentNode, if_block_anchor);
+			}
+		},
+		i(local) {
+			if (current) return;
+			transition_in(if_block);
+			current = true;
+		},
+		o(local) {
+			transition_out(if_block);
+			current = false;
+		},
+		d(detaching) {
+			if_blocks[current_block_type_index].d(detaching);
+			if (detaching) detach(if_block_anchor);
+		}
+	};
+}
+
+// (24:4) {:else}
+function create_else_block(ctx) {
+	let plaininput;
+	let updating_node;
+	let updating_prop;
+	let updating_value;
+	let updating_type;
+	let updating_icon;
+	let updating_label;
+	let updating_placeholder;
+	let updating_maximize;
+	let current;
+
+	function plaininput_node_binding(value) {
+		/*plaininput_node_binding*/ ctx[18](value);
+	}
+
+	function plaininput_prop_binding(value) {
+		/*plaininput_prop_binding*/ ctx[19](value);
+	}
+
+	function plaininput_value_binding(value) {
+		/*plaininput_value_binding*/ ctx[20](value);
+	}
+
+	function plaininput_type_binding(value) {
+		/*plaininput_type_binding*/ ctx[21](value);
+	}
+
+	function plaininput_icon_binding(value) {
+		/*plaininput_icon_binding*/ ctx[22](value);
+	}
+
+	function plaininput_label_binding(value) {
+		/*plaininput_label_binding*/ ctx[23](value);
+	}
+
+	function plaininput_placeholder_binding(value) {
+		/*plaininput_placeholder_binding*/ ctx[24](value);
+	}
+
+	function plaininput_maximize_binding(value) {
+		/*plaininput_maximize_binding*/ ctx[25](value);
+	}
+
+	let plaininput_props = {
+		credentials: /*credentials*/ ctx[9],
+		id: /*id*/ ctx[10]
+	};
+
+	if (/*node*/ ctx[2] !== void 0) {
+		plaininput_props.node = /*node*/ ctx[2];
+	}
+
+	if (/*prop*/ ctx[3] !== void 0) {
+		plaininput_props.prop = /*prop*/ ctx[3];
+	}
+
+	if (/*value*/ ctx[0] !== void 0) {
+		plaininput_props.value = /*value*/ ctx[0];
+	}
+
+	if (/*type*/ ctx[1] !== void 0) {
+		plaininput_props.type = /*type*/ ctx[1];
+	}
+
+	if (/*icon*/ ctx[4] !== void 0) {
+		plaininput_props.icon = /*icon*/ ctx[4];
+	}
+
+	if (/*label*/ ctx[5] !== void 0) {
+		plaininput_props.label = /*label*/ ctx[5];
+	}
+
+	if (/*placeholder*/ ctx[6] !== void 0) {
+		plaininput_props.placeholder = /*placeholder*/ ctx[6];
+	}
+
+	if (/*maximize*/ ctx[8] !== void 0) {
+		plaininput_props.maximize = /*maximize*/ ctx[8];
+	}
+
+	plaininput = new PlainInput({ props: plaininput_props });
+	binding_callbacks.push(() => bind(plaininput, "node", plaininput_node_binding));
+	binding_callbacks.push(() => bind(plaininput, "prop", plaininput_prop_binding));
+	binding_callbacks.push(() => bind(plaininput, "value", plaininput_value_binding));
+	binding_callbacks.push(() => bind(plaininput, "type", plaininput_type_binding));
+	binding_callbacks.push(() => bind(plaininput, "icon", plaininput_icon_binding));
+	binding_callbacks.push(() => bind(plaininput, "label", plaininput_label_binding));
+	binding_callbacks.push(() => bind(plaininput, "placeholder", plaininput_placeholder_binding));
+	binding_callbacks.push(() => bind(plaininput, "maximize", plaininput_maximize_binding));
+	plaininput.$on("change", /*change_handler_1*/ ctx[26]);
+	plaininput.$on("mouseenter", /*mouseenter_handler_1*/ ctx[27]);
+	plaininput.$on("mouseleave", /*mouseleave_handler_1*/ ctx[28]);
+
+	return {
+		c() {
+			create_component(plaininput.$$.fragment);
+		},
+		m(target, anchor) {
+			mount_component(plaininput, target, anchor);
+			current = true;
+		},
+		p(ctx, dirty) {
+			const plaininput_changes = {};
+			if (dirty[0] & /*credentials*/ 512) plaininput_changes.credentials = /*credentials*/ ctx[9];
+			if (dirty[0] & /*id*/ 1024) plaininput_changes.id = /*id*/ ctx[10];
+
+			if (!updating_node && dirty[0] & /*node*/ 4) {
+				updating_node = true;
+				plaininput_changes.node = /*node*/ ctx[2];
+				add_flush_callback(() => updating_node = false);
+			}
+
+			if (!updating_prop && dirty[0] & /*prop*/ 8) {
+				updating_prop = true;
+				plaininput_changes.prop = /*prop*/ ctx[3];
+				add_flush_callback(() => updating_prop = false);
+			}
+
+			if (!updating_value && dirty[0] & /*value*/ 1) {
+				updating_value = true;
+				plaininput_changes.value = /*value*/ ctx[0];
+				add_flush_callback(() => updating_value = false);
+			}
+
+			if (!updating_type && dirty[0] & /*type*/ 2) {
+				updating_type = true;
+				plaininput_changes.type = /*type*/ ctx[1];
+				add_flush_callback(() => updating_type = false);
+			}
+
+			if (!updating_icon && dirty[0] & /*icon*/ 16) {
+				updating_icon = true;
+				plaininput_changes.icon = /*icon*/ ctx[4];
+				add_flush_callback(() => updating_icon = false);
+			}
+
+			if (!updating_label && dirty[0] & /*label*/ 32) {
+				updating_label = true;
+				plaininput_changes.label = /*label*/ ctx[5];
+				add_flush_callback(() => updating_label = false);
+			}
+
+			if (!updating_placeholder && dirty[0] & /*placeholder*/ 64) {
+				updating_placeholder = true;
+				plaininput_changes.placeholder = /*placeholder*/ ctx[6];
+				add_flush_callback(() => updating_placeholder = false);
+			}
+
+			if (!updating_maximize && dirty[0] & /*maximize*/ 256) {
+				updating_maximize = true;
+				plaininput_changes.maximize = /*maximize*/ ctx[8];
+				add_flush_callback(() => updating_maximize = false);
+			}
+
+			plaininput.$set(plaininput_changes);
+		},
+		i(local) {
+			if (current) return;
+			transition_in(plaininput.$$.fragment, local);
+			current = true;
+		},
+		o(local) {
+			transition_out(plaininput.$$.fragment, local);
+			current = false;
+		},
+		d(detaching) {
+			destroy_component(plaininput, detaching);
+		}
+	};
+}
+
+// (22:4) {#if type === 'config'}
+function create_if_block_1$1(ctx) {
+	let confignodeinput;
+	let updating_node;
+	let updating_prop;
+	let updating_label;
+	let current;
+
+	function confignodeinput_node_binding(value) {
+		/*confignodeinput_node_binding*/ ctx[12](value);
+	}
+
+	function confignodeinput_prop_binding(value) {
+		/*confignodeinput_prop_binding*/ ctx[13](value);
+	}
+
+	function confignodeinput_label_binding(value) {
+		/*confignodeinput_label_binding*/ ctx[14](value);
+	}
+
+	let confignodeinput_props = { icon: /*icon*/ ctx[4] };
+
+	if (/*node*/ ctx[2] !== void 0) {
+		confignodeinput_props.node = /*node*/ ctx[2];
+	}
+
+	if (/*prop*/ ctx[3] !== void 0) {
+		confignodeinput_props.prop = /*prop*/ ctx[3];
+	}
+
+	if (/*label*/ ctx[5] !== void 0) {
+		confignodeinput_props.label = /*label*/ ctx[5];
+	}
+
+	confignodeinput = new ConfigNodeInput({ props: confignodeinput_props });
+	binding_callbacks.push(() => bind(confignodeinput, "node", confignodeinput_node_binding));
+	binding_callbacks.push(() => bind(confignodeinput, "prop", confignodeinput_prop_binding));
+	binding_callbacks.push(() => bind(confignodeinput, "label", confignodeinput_label_binding));
+	confignodeinput.$on("change", /*change_handler*/ ctx[15]);
+	confignodeinput.$on("mouseenter", /*mouseenter_handler*/ ctx[16]);
+	confignodeinput.$on("mouseleave", /*mouseleave_handler*/ ctx[17]);
+
+	return {
+		c() {
+			create_component(confignodeinput.$$.fragment);
+		},
+		m(target, anchor) {
+			mount_component(confignodeinput, target, anchor);
+			current = true;
+		},
+		p(ctx, dirty) {
+			const confignodeinput_changes = {};
+			if (dirty[0] & /*icon*/ 16) confignodeinput_changes.icon = /*icon*/ ctx[4];
+
+			if (!updating_node && dirty[0] & /*node*/ 4) {
+				updating_node = true;
+				confignodeinput_changes.node = /*node*/ ctx[2];
+				add_flush_callback(() => updating_node = false);
+			}
+
+			if (!updating_prop && dirty[0] & /*prop*/ 8) {
+				updating_prop = true;
+				confignodeinput_changes.prop = /*prop*/ ctx[3];
+				add_flush_callback(() => updating_prop = false);
+			}
+
+			if (!updating_label && dirty[0] & /*label*/ 32) {
+				updating_label = true;
+				confignodeinput_changes.label = /*label*/ ctx[5];
+				add_flush_callback(() => updating_label = false);
+			}
+
+			confignodeinput.$set(confignodeinput_changes);
+		},
+		i(local) {
+			if (current) return;
+			transition_in(confignodeinput.$$.fragment, local);
+			current = true;
+		},
+		o(local) {
+			transition_out(confignodeinput.$$.fragment, local);
+			current = false;
+		},
+		d(detaching) {
+			destroy_component(confignodeinput, detaching);
+		}
+	};
+}
+
+function create_fragment$2(ctx) {
+	let current_block_type_index;
+	let if_block;
+	let if_block_anchor;
+	let current;
+	const if_block_creators = [create_if_block$1, create_else_block_1];
+	const if_blocks = [];
+
+	function select_block_type(ctx, dirty) {
+		if (/*inline*/ ctx[7]) return 0;
+		return 1;
+	}
+
+	current_block_type_index = select_block_type(ctx);
+	if_block = if_blocks[current_block_type_index] = if_block_creators[current_block_type_index](ctx);
+
+	return {
+		c() {
+			if_block.c();
+			if_block_anchor = empty();
+		},
+		m(target, anchor) {
+			if_blocks[current_block_type_index].m(target, anchor);
+			insert(target, if_block_anchor, anchor);
+			current = true;
+		},
+		p(ctx, dirty) {
+			let previous_block_index = current_block_type_index;
+			current_block_type_index = select_block_type(ctx);
+
+			if (current_block_type_index === previous_block_index) {
+				if_blocks[current_block_type_index].p(ctx, dirty);
+			} else {
+				group_outros();
+
+				transition_out(if_blocks[previous_block_index], 1, 1, () => {
+					if_blocks[previous_block_index] = null;
+				});
+
+				check_outros();
+				if_block = if_blocks[current_block_type_index];
+
+				if (!if_block) {
+					if_block = if_blocks[current_block_type_index] = if_block_creators[current_block_type_index](ctx);
+					if_block.c();
+				} else {
+					if_block.p(ctx, dirty);
+				}
+
+				transition_in(if_block, 1);
+				if_block.m(if_block_anchor.parentNode, if_block_anchor);
+			}
+		},
+		i(local) {
+			if (current) return;
+			transition_in(if_block);
+			current = true;
+		},
+		o(local) {
+			transition_out(if_block);
+			current = false;
+		},
+		d(detaching) {
+			if_blocks[current_block_type_index].d(detaching);
+			if (detaching) detach(if_block_anchor);
+		}
+	};
+}
+
+function getBooleanFrom(property) {
+	return typeof property === "boolean"
+	? property
+	: property.toString().toLowerCase() === "true";
+}
+
+function instance$2($$self, $$props, $$invalidate) {
+	let { node } = $$props,
+		{ prop } = $$props,
+		{ value } = $$props,
+		{ type } = $$props,
+		{ icon } = $$props,
+		{ credentials } = $$props,
+		{ label } = $$props,
+		{ placeholder } = $$props,
+		{ id } = $$props,
+		{ inline = false } = $$props,
+		{ maximize = false } = $$props,
+		{ checked } = $$props;
+
+	if (type === "checkbox" && typeof checked !== "undefined") {
+		value = getBooleanFrom(checked);
+	}
+
+	inline = getBooleanFrom(inline);
+	maximize = getBooleanFrom(maximize);
+
+	function confignodeinput_node_binding(value) {
+		node = value;
+		$$invalidate(2, node);
+	}
+
+	function confignodeinput_prop_binding(value) {
+		prop = value;
+		$$invalidate(3, prop);
+	}
+
+	function confignodeinput_label_binding(value) {
+		label = value;
+		$$invalidate(5, label);
+	}
+
+	function change_handler(event) {
+		bubble($$self, event);
+	}
+
+	function mouseenter_handler(event) {
+		bubble($$self, event);
+	}
+
+	function mouseleave_handler(event) {
+		bubble($$self, event);
+	}
+
+	function plaininput_node_binding(value) {
+		node = value;
+		$$invalidate(2, node);
+	}
+
+	function plaininput_prop_binding(value) {
+		prop = value;
+		$$invalidate(3, prop);
+	}
+
+	function plaininput_value_binding(value$1) {
+		value = value$1;
+		$$invalidate(0, value);
+	}
+
+	function plaininput_type_binding(value) {
+		type = value;
+		$$invalidate(1, type);
+	}
+
+	function plaininput_icon_binding(value) {
+		icon = value;
+		$$invalidate(4, icon);
+	}
+
+	function plaininput_label_binding(value) {
+		label = value;
+		$$invalidate(5, label);
+	}
+
+	function plaininput_placeholder_binding(value) {
+		placeholder = value;
+		$$invalidate(6, placeholder);
+	}
+
+	function plaininput_maximize_binding(value) {
+		maximize = value;
+		$$invalidate(8, maximize);
+	}
+
+	function change_handler_1(event) {
+		bubble($$self, event);
+	}
+
+	function mouseenter_handler_1(event) {
+		bubble($$self, event);
+	}
+
+	function mouseleave_handler_1(event) {
+		bubble($$self, event);
+	}
+
+	function confignodeinput_node_binding_1(value) {
+		node = value;
+		$$invalidate(2, node);
+	}
+
+	function confignodeinput_prop_binding_1(value) {
+		prop = value;
+		$$invalidate(3, prop);
+	}
+
+	function confignodeinput_label_binding_1(value) {
+		label = value;
+		$$invalidate(5, label);
+	}
+
+	function change_handler_2(event) {
+		bubble($$self, event);
+	}
+
+	function mouseenter_handler_2(event) {
+		bubble($$self, event);
+	}
+
+	function mouseleave_handler_2(event) {
+		bubble($$self, event);
+	}
+
+	function plaininput_node_binding_1(value) {
+		node = value;
+		$$invalidate(2, node);
+	}
+
+	function plaininput_prop_binding_1(value) {
+		prop = value;
+		$$invalidate(3, prop);
+	}
+
+	function plaininput_value_binding_1(value$1) {
+		value = value$1;
+		$$invalidate(0, value);
+	}
+
+	function plaininput_type_binding_1(value) {
+		type = value;
+		$$invalidate(1, type);
+	}
+
+	function plaininput_icon_binding_1(value) {
+		icon = value;
+		$$invalidate(4, icon);
+	}
+
+	function plaininput_label_binding_1(value) {
+		label = value;
+		$$invalidate(5, label);
+	}
+
+	function plaininput_placeholder_binding_1(value) {
+		placeholder = value;
+		$$invalidate(6, placeholder);
+	}
+
+	function plaininput_maximize_binding_1(value) {
+		maximize = value;
+		$$invalidate(8, maximize);
+	}
+
+	function change_handler_3(event) {
+		bubble($$self, event);
+	}
+
+	function mouseenter_handler_3(event) {
+		bubble($$self, event);
+	}
+
+	function mouseleave_handler_3(event) {
+		bubble($$self, event);
+	}
+
+	$$self.$$set = $$props => {
+		if ("node" in $$props) $$invalidate(2, node = $$props.node);
+		if ("prop" in $$props) $$invalidate(3, prop = $$props.prop);
+		if ("value" in $$props) $$invalidate(0, value = $$props.value);
+		if ("type" in $$props) $$invalidate(1, type = $$props.type);
+		if ("icon" in $$props) $$invalidate(4, icon = $$props.icon);
+		if ("credentials" in $$props) $$invalidate(9, credentials = $$props.credentials);
+		if ("label" in $$props) $$invalidate(5, label = $$props.label);
+		if ("placeholder" in $$props) $$invalidate(6, placeholder = $$props.placeholder);
+		if ("id" in $$props) $$invalidate(10, id = $$props.id);
+		if ("inline" in $$props) $$invalidate(7, inline = $$props.inline);
+		if ("maximize" in $$props) $$invalidate(8, maximize = $$props.maximize);
+		if ("checked" in $$props) $$invalidate(11, checked = $$props.checked);
+	};
+
+	$$self.$$.update = () => {
+		if ($$self.$$.dirty[0] & /*type, checked, value*/ 2051) {
+			if (type === "checkbox" && typeof checked !== "undefined") {
+				$$invalidate(11, checked = value);
+			}
+		}
+	};
+
+	return [
+		value,
+		type,
+		node,
+		prop,
+		icon,
+		label,
+		placeholder,
+		inline,
+		maximize,
+		credentials,
+		id,
+		checked,
+		confignodeinput_node_binding,
+		confignodeinput_prop_binding,
+		confignodeinput_label_binding,
+		change_handler,
+		mouseenter_handler,
+		mouseleave_handler,
+		plaininput_node_binding,
+		plaininput_prop_binding,
+		plaininput_value_binding,
+		plaininput_type_binding,
+		plaininput_icon_binding,
+		plaininput_label_binding,
+		plaininput_placeholder_binding,
+		plaininput_maximize_binding,
+		change_handler_1,
+		mouseenter_handler_1,
+		mouseleave_handler_1,
+		confignodeinput_node_binding_1,
+		confignodeinput_prop_binding_1,
+		confignodeinput_label_binding_1,
+		change_handler_2,
+		mouseenter_handler_2,
+		mouseleave_handler_2,
+		plaininput_node_binding_1,
+		plaininput_prop_binding_1,
+		plaininput_value_binding_1,
+		plaininput_type_binding_1,
+		plaininput_icon_binding_1,
+		plaininput_label_binding_1,
+		plaininput_placeholder_binding_1,
+		plaininput_maximize_binding_1,
+		change_handler_3,
+		mouseenter_handler_3,
+		mouseleave_handler_3
+	];
+}
+
+class Input extends SvelteComponent {
+	constructor(options) {
+		super();
+
+		init(
+			this,
+			options,
+			instance$2,
+			create_fragment$2,
+			safe_not_equal,
+			{
+				node: 2,
+				prop: 3,
+				value: 0,
+				type: 1,
+				icon: 4,
+				credentials: 9,
+				label: 5,
+				placeholder: 6,
+				id: 10,
+				inline: 7,
+				maximize: 8,
+				checked: 11
+			},
+			[-1, -1]
+		);
+	}
+}
+
+/* node_modules/svelte-integration-red/components/Group.svelte generated by Svelte v3.35.0 */
+
+function create_if_block(ctx) {
+	let label_1;
+	let t0;
+	let t1;
+	let label_1_for_value;
+	let if_block = /*icon*/ ctx[1] && create_if_block_1(ctx);
+
+	return {
+		c() {
+			label_1 = element("label");
+			if (if_block) if_block.c();
+			t0 = space();
+			t1 = text(/*label*/ ctx[0]);
+			attr(label_1, "for", label_1_for_value = "node-input-" + /*id*/ ctx[3] + "-container");
+			set_style(label_1, "width", "auto");
+		},
+		m(target, anchor) {
+			insert(target, label_1, anchor);
+			if (if_block) if_block.m(label_1, null);
+			append(label_1, t0);
+			append(label_1, t1);
+		},
+		p(ctx, dirty) {
+			if (/*icon*/ ctx[1]) {
+				if (if_block) {
+					if_block.p(ctx, dirty);
+				} else {
+					if_block = create_if_block_1(ctx);
+					if_block.c();
+					if_block.m(label_1, t0);
+				}
+			} else if (if_block) {
+				if_block.d(1);
+				if_block = null;
+			}
+
+			if (dirty & /*label*/ 1) set_data(t1, /*label*/ ctx[0]);
+
+			if (dirty & /*id*/ 8 && label_1_for_value !== (label_1_for_value = "node-input-" + /*id*/ ctx[3] + "-container")) {
+				attr(label_1, "for", label_1_for_value);
+			}
+		},
+		d(detaching) {
+			if (detaching) detach(label_1);
+			if (if_block) if_block.d();
+		}
+	};
+}
+
+// (7:64) {#if icon}
+function create_if_block_1(ctx) {
+	let i;
+	let i_class_value;
+
+	return {
+		c() {
+			i = element("i");
+			attr(i, "class", i_class_value = "fa fa-" + /*icon*/ ctx[1]);
+		},
+		m(target, anchor) {
+			insert(target, i, anchor);
+		},
+		p(ctx, dirty) {
+			if (dirty & /*icon*/ 2 && i_class_value !== (i_class_value = "fa fa-" + /*icon*/ ctx[1])) {
+				attr(i, "class", i_class_value);
+			}
+		},
+		d(detaching) {
+			if (detaching) detach(i);
+		}
+	};
+}
+
+function create_fragment$1(ctx) {
+	let t;
+	let div;
+	let div_id_value;
+	let div_style_value;
+	let current;
+	let if_block = /*label*/ ctx[0] && create_if_block(ctx);
+	const default_slot_template = /*#slots*/ ctx[5].default;
+	const default_slot = create_slot(default_slot_template, ctx, /*$$scope*/ ctx[4], null);
+
+	return {
+		c() {
+			if (if_block) if_block.c();
+			t = space();
+			div = element("div");
+			if (default_slot) default_slot.c();
+			attr(div, "id", div_id_value = "node-input-" + /*id*/ ctx[3] + "-container");
+			attr(div, "class", "red-ui-editableList-border form-row");
+			attr(div, "style", div_style_value = "padding: 12px 12px 0px 12px; " + /*style*/ ctx[2]);
+		},
+		m(target, anchor) {
+			if (if_block) if_block.m(target, anchor);
+			insert(target, t, anchor);
+			insert(target, div, anchor);
+
+			if (default_slot) {
+				default_slot.m(div, null);
+			}
+
+			current = true;
+		},
+		p(ctx, [dirty]) {
+			if (/*label*/ ctx[0]) {
+				if (if_block) {
+					if_block.p(ctx, dirty);
+				} else {
+					if_block = create_if_block(ctx);
+					if_block.c();
+					if_block.m(t.parentNode, t);
+				}
+			} else if (if_block) {
+				if_block.d(1);
+				if_block = null;
+			}
+
+			if (default_slot) {
+				if (default_slot.p && dirty & /*$$scope*/ 16) {
+					update_slot(default_slot, default_slot_template, ctx, /*$$scope*/ ctx[4], dirty, null, null);
+				}
+			}
+
+			if (!current || dirty & /*id*/ 8 && div_id_value !== (div_id_value = "node-input-" + /*id*/ ctx[3] + "-container")) {
+				attr(div, "id", div_id_value);
+			}
+
+			if (!current || dirty & /*style*/ 4 && div_style_value !== (div_style_value = "padding: 12px 12px 0px 12px; " + /*style*/ ctx[2])) {
+				attr(div, "style", div_style_value);
+			}
+		},
+		i(local) {
+			if (current) return;
+			transition_in(default_slot, local);
+			current = true;
+		},
+		o(local) {
+			transition_out(default_slot, local);
+			current = false;
+		},
+		d(detaching) {
+			if (if_block) if_block.d(detaching);
+			if (detaching) detach(t);
+			if (detaching) detach(div);
+			if (default_slot) default_slot.d(detaching);
+		}
+	};
+}
+
+function instance$1($$self, $$props, $$invalidate) {
+	let { $$slots: slots = {}, $$scope } = $$props;
+	let { label } = $$props, { icon } = $$props, { style } = $$props;
+	let { id = Date.now() + Math.floor(Math.random() * Number.MAX_SAFE_INTEGER) } = $$props;
+
+	$$self.$$set = $$props => {
+		if ("label" in $$props) $$invalidate(0, label = $$props.label);
+		if ("icon" in $$props) $$invalidate(1, icon = $$props.icon);
+		if ("style" in $$props) $$invalidate(2, style = $$props.style);
+		if ("id" in $$props) $$invalidate(3, id = $$props.id);
+		if ("$$scope" in $$props) $$invalidate(4, $$scope = $$props.$$scope);
+	};
+
+	return [label, icon, style, id, $$scope, slots];
+}
+
+class Group extends SvelteComponent {
+	constructor(options) {
+		super();
+		init(this, options, instance$1, create_fragment$1, safe_not_equal, { label: 0, icon: 1, style: 2, id: 3 });
+	}
+}
+
 /* src/shuttle-receive.svelte generated by Svelte v3.35.0 */
+
+function get_each_context(ctx, list, i) {
+	const child_ctx = ctx.slice();
+	child_ctx[5] = list[i];
+	child_ctx[6] = list;
+	child_ctx[7] = i;
+	return child_ctx;
+}
+
+// (41:1) {#each controlNodes as controlNode (controlNode.id)}
+function create_each_block(key_1, ctx) {
+	let first;
+	let input;
+	let updating_checked;
+	let current;
+
+	function input_checked_binding(value) {
+		/*input_checked_binding*/ ctx[2](value, /*controlNode*/ ctx[5]);
+	}
+
+	function change_handler(...args) {
+		return /*change_handler*/ ctx[3](/*controlNode*/ ctx[5], ...args);
+	}
+
+	function mouseenter_handler() {
+		return /*mouseenter_handler*/ ctx[4](/*controlNode*/ ctx[5]);
+	}
+
+	let input_props = {
+		inline: true,
+		type: "checkbox",
+		label: "Shuttle control: " + (/*controlNode*/ ctx[5].runtimeId || /*controlNode*/ ctx[5].id)
+	};
+
+	if (/*node*/ ctx[0].listenTo[/*controlNode*/ ctx[5].id] !== void 0) {
+		input_props.checked = /*node*/ ctx[0].listenTo[/*controlNode*/ ctx[5].id];
+	}
+
+	input = new Input({ props: input_props });
+	binding_callbacks.push(() => bind(input, "checked", input_checked_binding));
+	input.$on("change", change_handler);
+	input.$on("mouseenter", mouseenter_handler);
+
+	return {
+		key: key_1,
+		first: null,
+		c() {
+			first = empty();
+			create_component(input.$$.fragment);
+			this.first = first;
+		},
+		m(target, anchor) {
+			insert(target, first, anchor);
+			mount_component(input, target, anchor);
+			current = true;
+		},
+		p(new_ctx, dirty) {
+			ctx = new_ctx;
+			const input_changes = {};
+			if (dirty & /*controlNodes*/ 2) input_changes.label = "Shuttle control: " + (/*controlNode*/ ctx[5].runtimeId || /*controlNode*/ ctx[5].id);
+
+			if (!updating_checked && dirty & /*node, controlNodes*/ 3) {
+				updating_checked = true;
+				input_changes.checked = /*node*/ ctx[0].listenTo[/*controlNode*/ ctx[5].id];
+				add_flush_callback(() => updating_checked = false);
+			}
+
+			input.$set(input_changes);
+		},
+		i(local) {
+			if (current) return;
+			transition_in(input.$$.fragment, local);
+			current = true;
+		},
+		o(local) {
+			transition_out(input.$$.fragment, local);
+			current = false;
+		},
+		d(detaching) {
+			if (detaching) detach(first);
+			destroy_component(input, detaching);
+		}
+	};
+}
+
+// (40:0) <Group label="Listen to:" icon="list" style="padding-top: 0px;">
+function create_default_slot(ctx) {
+	let each_blocks = [];
+	let each_1_lookup = new Map();
+	let each_1_anchor;
+	let current;
+	let each_value = /*controlNodes*/ ctx[1];
+	const get_key = ctx => /*controlNode*/ ctx[5].id;
+
+	for (let i = 0; i < each_value.length; i += 1) {
+		let child_ctx = get_each_context(ctx, each_value, i);
+		let key = get_key(child_ctx);
+		each_1_lookup.set(key, each_blocks[i] = create_each_block(key, child_ctx));
+	}
+
+	return {
+		c() {
+			for (let i = 0; i < each_blocks.length; i += 1) {
+				each_blocks[i].c();
+			}
+
+			each_1_anchor = empty();
+		},
+		m(target, anchor) {
+			for (let i = 0; i < each_blocks.length; i += 1) {
+				each_blocks[i].m(target, anchor);
+			}
+
+			insert(target, each_1_anchor, anchor);
+			current = true;
+		},
+		p(ctx, dirty) {
+			if (dirty & /*controlNodes, node, RED*/ 3) {
+				each_value = /*controlNodes*/ ctx[1];
+				group_outros();
+				each_blocks = update_keyed_each(each_blocks, dirty, get_key, 1, ctx, each_value, each_1_lookup, each_1_anchor.parentNode, outro_and_destroy_block, create_each_block, each_1_anchor, get_each_context);
+				check_outros();
+			}
+		},
+		i(local) {
+			if (current) return;
+
+			for (let i = 0; i < each_value.length; i += 1) {
+				transition_in(each_blocks[i]);
+			}
+
+			current = true;
+		},
+		o(local) {
+			for (let i = 0; i < each_blocks.length; i += 1) {
+				transition_out(each_blocks[i]);
+			}
+
+			current = false;
+		},
+		d(detaching) {
+			for (let i = 0; i < each_blocks.length; i += 1) {
+				each_blocks[i].d(detaching);
+			}
+
+			if (detaching) detach(each_1_anchor);
+		}
+	};
+}
+
+function create_fragment(ctx) {
+	let group;
+	let current;
+
+	group = new Group({
+			props: {
+				label: "Listen to:",
+				icon: "list",
+				style: "padding-top: 0px;",
+				$$slots: { default: [create_default_slot] },
+				$$scope: { ctx }
+			}
+		});
+
+	return {
+		c() {
+			create_component(group.$$.fragment);
+		},
+		m(target, anchor) {
+			mount_component(group, target, anchor);
+			current = true;
+		},
+		p(ctx, [dirty]) {
+			const group_changes = {};
+
+			if (dirty & /*$$scope, controlNodes, node*/ 259) {
+				group_changes.$$scope = { dirty, ctx };
+			}
+
+			group.$set(group_changes);
+		},
+		i(local) {
+			if (current) return;
+			transition_in(group.$$.fragment, local);
+			current = true;
+		},
+		o(local) {
+			transition_out(group.$$.fragment, local);
+			current = false;
+		},
+		d(detaching) {
+			destroy_component(group, detaching);
+		}
+	};
+}
 
 RED.nodes.registerType("shuttle-receive", {
 	name: { value: "shuttle-receive" },
-	category: "Node-RED",
+	category: "Runtime",
 	color: "#D9A6AB",
-	defaults: { name: { value: "", label: "Name" } },
+	defaults: {
+		name: { value: "", label: "Name" },
+		listenTo: { value: {} }
+	},
 	inputs: 0,
 	outputs: 1,
 	icon() {
@@ -290,19 +3357,31 @@ RED.nodes.registerType("shuttle-receive", {
 });
 
 function instance($$self, $$props, $$invalidate) {
+	let controlNodes;
 	let { node } = $$props;
+
+	function input_checked_binding(value, controlNode) {
+		if ($$self.$$.not_equal(node.listenTo[controlNode.id], value)) {
+			node.listenTo[controlNode.id] = value;
+			$$invalidate(0, node);
+		}
+	}
+
+	const change_handler = (controlNode, e) => $$invalidate(0, node.listenTo[controlNode.id] = e.detail.value, node);
+	const mouseenter_handler = controlNode => RED.view.reveal(controlNode.id);
 
 	$$self.$$set = $$props => {
 		if ("node" in $$props) $$invalidate(0, node = $$props.node);
 	};
 
-	return [node];
+	$$invalidate(1, controlNodes = RED.nodes.filterNodes({ type: "shuttle-control" }).filter(node => node.action === "start"));
+	return [node, controlNodes, input_checked_binding, change_handler, mouseenter_handler];
 }
 
 class Shuttle_receive extends SvelteComponent {
 	constructor(options) {
 		super();
-		init(this, options, instance, null, safe_not_equal, { node: 0 });
+		init(this, options, instance, create_fragment, safe_not_equal, { node: 0 });
 	}
 }
 

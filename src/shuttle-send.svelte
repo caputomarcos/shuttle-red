@@ -7,11 +7,11 @@
 			name: { value: "", label: "Name" }
 		},
 		inputs: 1,
-		outputs: 1,
+		outputs: 0,
 		icon: function() {
-			return "font-awesome/fa-file-rocket";
+			return "font-awesome/fa-rocket";
 		},
-		paletteLabel: "Send Message",
+		paletteLabel: "Send message",
 		label: function() {
 			if (this.name) {
 				return this.name

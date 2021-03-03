@@ -1,38 +1,39 @@
 
             <script type='text/javascript'>
-              function render (node) {
-                try {
-                  if (typeof node !== 'object') {
-                    return
-                  }
-                  if (!node.__clone) {
-                    node.__clone = window.$.extend(true, {}, node)
-                  }
-                  new Shuttle_receive({
-                    target: document.getElementById('shuttle-receive-svelte-container'),
-                    props: { node: node.__clone }
-                  })
-                } catch (e) {
-                    console.log(e)
-                }
-              }
-              function update (node) {
-                if (node.__clone) {
-                  const clone = node.__clone
-                  delete node.__clone
-                  const defaultKeys = Object.keys(node._def.defaults)
-                  for (const key of Object.keys(clone)) {
-                    if (defaultKeys.indexOf(key) === -1) {
-                      delete clone[key]
+              {
+                function render (node) {
+                  try {
+                    if (typeof node !== 'object') {
+                      return
                     }
+                    if (!node.__clone) {
+                      node.__clone = window.$.extend(true, {}, node)
+                    }
+                    new Shuttle_receive({
+                      target: document.getElementById('shuttle-receive-svelte-container'),
+                      props: { node: node.__clone }
+                    })
+                  } catch (e) {
+                      console.log(e)
                   }
-                  Object.assign(node, clone)
                 }
-              }
-              function revert (node) {
-                delete node.__clone
-              }
-              function noop() { }
+                function update (node) {
+                  if (node.__clone) {
+                    const clone = node.__clone
+                    delete node.__clone
+                    const defaultKeys = Object.keys(node._def.defaults)
+                    for (const key of Object.keys(clone)) {
+                      if (defaultKeys.indexOf(key) === -1) {
+                        delete clone[key]
+                      }
+                    }
+                    Object.assign(node, clone)
+                  }
+                }
+                function revert (node) {
+                  delete node.__clone
+                }
+                function noop() { }
 function run(fn) {
     return fn();
 }
@@ -264,12 +265,12 @@ RED.nodes.registerType("shuttle-receive", {
 	category: "Node-RED",
 	color: "#D9A6AB",
 	defaults: { name: { value: "", label: "Name" } },
-	inputs: 1,
+	inputs: 0,
 	outputs: 1,
 	icon() {
-		return "font-awesome/fa-file-rocket";
+		return "font-awesome/fa-rocket";
 	},
-	paletteLabel: "Receive Message",
+	paletteLabel: "Receive message",
 	label() {
 		if (this.name) {
 			return this.name;
@@ -307,6 +308,7 @@ class Shuttle_receive extends SvelteComponent {
 
 
 
+              }
             </script>
             <script type="text/x-red" data-template-name="shuttle-receive">
                 <div id='shuttle-receive-svelte-container'></div>

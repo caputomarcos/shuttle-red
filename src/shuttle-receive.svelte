@@ -6,12 +6,12 @@
 		defaults: {
 			name: { value: "", label: "Name" }
 		},
-		inputs: 1,
+		inputs: 0,
 		outputs: 1,
 		icon: function() {
-			return "font-awesome/fa-file-rocket";
+			return "font-awesome/fa-rocket";
 		},
-		paletteLabel: "Receive Message",
+		paletteLabel: "Receive message",
 		label: function() {
 			if (this.name) {
 				return this.name

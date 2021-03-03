@@ -9,14 +9,14 @@
 		inputs: 1,
 		outputs: 1,
 		icon: function() {
-			return "font-awesome/fa-file-rocket";
+			return "font-awesome/fa-rocket";
 		},
-		paletteLabel: "Control Shuttle",
+		paletteLabel: "Control shuttle",
 		label: function() {
 			if (this.name) {
 				return this.name
 			} else {
-				return "Control Shuttle"
+				return "Control shuttle"
 			}
 		},
 		oneditprepare: function() {

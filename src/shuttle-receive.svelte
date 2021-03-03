@@ -9,14 +9,14 @@
 		inputs: 0,
 		outputs: 1,
 		icon: function() {
-			return "font-awesome/fa-rocket";
+			return "font-awesome/fa-envelope-open";
 		},
-		paletteLabel: "Receive message",
+		paletteLabel: "message in",
 		label: function() {
 			if (this.name) {
 				return this.name
 			} else {
-				return "Receive message"
+				return "message in"
 			}
 		},
 		oneditprepare: function() {

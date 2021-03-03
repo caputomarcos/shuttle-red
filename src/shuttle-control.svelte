@@ -4,20 +4,19 @@
 		category: "Node-RED",
 		color: "#D9A6AB",
 		defaults: {
-			name: { value: "", label: "Name" }
+			action: { value: "start", label: "Action" },
+            runtime: { value: "latest", label: "Runtime" },
+            project: { value: "", label: "Project" }
 		},
 		inputs: 1,
 		outputs: 1,
 		icon: function() {
 			return "font-awesome/fa-rocket";
 		},
-		paletteLabel: "Control shuttle",
+		paletteLabel: "control",
 		label: function() {
-			if (this.name) {
-				return this.name
-			} else {
-				return "Control shuttle"
-			}
+			const projectTitle = this.project === '__EMPTY__' ? 'empty project' : this.project && this.project.startsWith('__MSG.') ? 'runtime' : this.project
+			return `${this.action} ${projectTitle}`
 		},
 		oneditprepare: function() {
 			render(this)
@@ -30,7 +29,21 @@
 		}
 	})
 </script>
-
 <script>
-    export let node
+	export let node
+	import { Select, Input } from 'svelte-integration-red/components'
 </script>
+<Input {node} prop="name" />
+<Select bind:node prop="action">
+	<option value="start">Start runtime</option>
+	<option value="stop">Stop runtime</option>
+	<option value="restart">Restart runtime</option>
+</Select>
+<Select bind:node prop="runtime">
+	<option value="latest">Latest</option>
+</Select>
+<Select bind:node prop="project">
+	<option value="__MSG.PAYLOAD__">Determine from msg.payload</option>
+	<option value="__MSG.PROJECT__">Determine from msg.project</option>
+	<option value="__EMPTY__">Empty project</option>
+</Select>

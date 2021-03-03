@@ -44,7 +44,7 @@
 			inline
 			type="checkbox"
 			bind:checked={node.listenTo[controlNode.id]}
-			label={"Shuttle control: " + (controlNode.runtimeId || controlNode.id)}
+			label={controlNode.runtimeId? controlNode.runtimeId : 'Unnamed shuttle (' + controlNode.id + ')'}
 			on:change={(e) => node.listenTo[controlNode.id] = e.detail.value}
 			on:mouseenter={() => RED.view.reveal(controlNode.id)} />
 	{/each}

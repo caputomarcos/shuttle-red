@@ -5,7 +5,8 @@
 		color: "#D9A6AB",
 		defaults: {
 			name: { value: "", label: "Name" },
-			sendTo: { value: {} }
+			sendTo: { value: {} },
+			sendToFilters: { value: {} }
 		},
 		inputs: 1,
 		outputs: 0,
@@ -33,7 +34,7 @@
 </script>
 <script>
 	export let node
-	import { Group, Input } from 'svelte-integration-red/components'
+	import { Group, Input, Row } from 'svelte-integration-red/components'
 
 	$: controlNodes = RED.nodes.filterNodes({ type: 'shuttle-control' }).filter((node) => node.action === 'start')
 </script>
@@ -41,11 +42,24 @@
 	{#each controlNodes as controlNode (controlNode.id)}
 		<!-- svelte-ignore missing-declaration -->
 		<Input
-			inline
 			type="checkbox"
 			bind:checked={node.sendTo[controlNode.id]}
-			label={"Shuttle control: " + (controlNode.runtimeId || controlNode.id)}
+			label={controlNode.runtimeId? controlNode.runtimeId : 'Unnamed shuttle (' + controlNode.id + ')'}
 			on:change={(e) => node.sendTo[controlNode.id] = e.detail.value}
 			on:mouseenter={() => RED.view.reveal(controlNode.id)} />
+		{#if node.sendTo[controlNode.id] && controlNode.runtimeId === ''}
+			<Row style="margin-left: 23px;">
+				<!-- svelte-ignore missing-declaration -->
+				<!--
+					TODO: Add restriction to ID coming from msg
+				-->
+				<Input
+					inline
+					bind:checked={node.sendToFilters[controlNode.id]}
+					label="Restrict&nbsp;to&nbsp;ID:"
+					on:change={(e) => node.sendToFilters[controlNode.id] = e.detail.value}
+					on:mouseenter={() => RED.view.reveal(controlNode.id)} />
+			</Row>
+		{/if}
 	{/each}
 </Group>

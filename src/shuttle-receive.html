@@ -3159,7 +3159,9 @@ function create_each_block(key_1, ctx) {
 	let input_props = {
 		inline: true,
 		type: "checkbox",
-		label: "Shuttle control: " + (/*controlNode*/ ctx[5].runtimeId || /*controlNode*/ ctx[5].id)
+		label: /*controlNode*/ ctx[5].runtimeId
+		? /*controlNode*/ ctx[5].runtimeId
+		: "Unnamed shuttle (" + /*controlNode*/ ctx[5].id + ")"
 	};
 
 	if (/*node*/ ctx[0].listenTo[/*controlNode*/ ctx[5].id] !== void 0) {
@@ -3187,7 +3189,10 @@ function create_each_block(key_1, ctx) {
 		p(new_ctx, dirty) {
 			ctx = new_ctx;
 			const input_changes = {};
-			if (dirty & /*controlNodes*/ 2) input_changes.label = "Shuttle control: " + (/*controlNode*/ ctx[5].runtimeId || /*controlNode*/ ctx[5].id);
+
+			if (dirty & /*controlNodes*/ 2) input_changes.label = /*controlNode*/ ctx[5].runtimeId
+			? /*controlNode*/ ctx[5].runtimeId
+			: "Unnamed shuttle (" + /*controlNode*/ ctx[5].id + ")";
 
 			if (!updating_checked && dirty & /*node, controlNodes*/ 3) {
 				updating_checked = true;

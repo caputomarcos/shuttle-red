@@ -1,0 +1,32 @@
+{
+  "name": "shuttle-red",
+  "version": "0.1.0",
+  "description": "A node that allows to create and manage new Node-RED instances.",
+  "author": "Christian Geiger",
+  "license": "MIT",
+  "keywords": [
+    "node-red",
+    "nodes",
+    "flow",
+    "multi-tenant"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://gitlab.com/2WeltenChris/shuttle-red.git"
+  },
+  "node-red": {
+    "nodes": {
+      "shuttle-control": "src/shuttle-control.js",
+      "shuttle-receive": "src/shuttle-receive.js",
+      "shuttle-send": "src/shuttle-send.js"
+    }
+  },
+  "dependencies": {
+  },
+  "devDependencies": {
+    "standard": "^16.0.3",
+    "svelte-integration-red": "^0.1.44"
+  },
+  "scripts": {
+  }
+}

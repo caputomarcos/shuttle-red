@@ -5,7 +5,7 @@
 		color: "#D9A6AB",
 		defaults: {
 			name: { value: "", label: "Name" },
-			listenTo: { value: {} }
+			listenTo: { value: { __PARENT__: true } }
 		},
 		inputs: 0,
 		outputs: 1,
@@ -38,6 +38,12 @@
 	$: controlNodes = RED.nodes.filterNodes({ type: 'shuttle-control' }).filter((node) => node.action === 'start')
 </script>
 <Group label="Listen to:" icon="list" style="padding-top: 0px;">
+	<Input
+		inline
+		type="checkbox"
+		bind:checked={node.listenTo['__PARENT__']}
+		label="Events from parent instance (controller)"
+		on:change={(e) => node.listenTo['__PARENT__'] = e.detail.value} />
 	{#each controlNodes as controlNode (controlNode.id)}
 		<!-- svelte-ignore missing-declaration -->
 		<Input

@@ -5,7 +5,7 @@
 		color: "#D9A6AB",
 		defaults: {
 			name: { value: "", label: "Name" },
-			sendTo: { value: {} },
+			sendTo: { value: { __PARENT__: true } },
 			sendToFilters: { value: {} }
 		},
 		inputs: 1,
@@ -38,7 +38,13 @@
 
 	$: controlNodes = RED.nodes.filterNodes({ type: 'shuttle-control' }).filter((node) => node.action === 'start')
 </script>
-<Group label="Listen to:" icon="list" style="padding-top: 0px;">
+<Group label="Send msg.payload to:" icon="list" style="padding-top: 0px;">
+	<Input
+		inline
+		type="checkbox"
+		bind:checked={node.sendTo['__PARENT__']}
+		label="Parent instance (controller)"
+		on:change={(e) => node.sendTo['__PARENT__'] = e.detail.value} />
 	{#each controlNodes as controlNode (controlNode.id)}
 		<!-- svelte-ignore missing-declaration -->
 		<Input
@@ -51,7 +57,7 @@
 			<Row style="margin-left: 23px;">
 				<!-- svelte-ignore missing-declaration -->
 				<!--
-					TODO: Add restriction to ID coming from msg
+					TODO: Add restriction to ID coming from msg.runtimeId
 				-->
 				<Input
 					inline

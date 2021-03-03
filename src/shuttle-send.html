@@ -3131,13 +3131,13 @@ class Group extends SvelteComponent {
 
 function get_each_context(ctx, list, i) {
 	const child_ctx = ctx.slice();
-	child_ctx[8] = list[i];
-	child_ctx[9] = list;
-	child_ctx[10] = i;
+	child_ctx[10] = list[i];
+	child_ctx[11] = list;
+	child_ctx[12] = i;
 	return child_ctx;
 }
 
-// (50:2) {#if node.sendTo[controlNode.id] && controlNode.runtimeId === ''}
+// (56:2) {#if node.sendTo[controlNode.id] && controlNode.runtimeId === ''}
 function create_if_block(ctx) {
 	let row;
 	let current;
@@ -3161,7 +3161,7 @@ function create_if_block(ctx) {
 		p(ctx, dirty) {
 			const row_changes = {};
 
-			if (dirty & /*$$scope, node, controlNodes*/ 2051) {
+			if (dirty & /*$$scope, node, controlNodes*/ 8195) {
 				row_changes.$$scope = { dirty, ctx };
 			}
 
@@ -3182,34 +3182,34 @@ function create_if_block(ctx) {
 	};
 }
 
-// (51:3) <Row style="margin-left: 23px;">
+// (57:3) <Row style="margin-left: 23px;">
 function create_default_slot_1(ctx) {
 	let input;
 	let updating_checked;
 	let t;
 	let current;
 
-	function input_checked_binding_1(value) {
-		/*input_checked_binding_1*/ ctx[5](value, /*controlNode*/ ctx[8]);
+	function input_checked_binding_2(value) {
+		/*input_checked_binding_2*/ ctx[7](value, /*controlNode*/ ctx[10]);
 	}
 
-	function change_handler_1(...args) {
-		return /*change_handler_1*/ ctx[6](/*controlNode*/ ctx[8], ...args);
+	function change_handler_2(...args) {
+		return /*change_handler_2*/ ctx[8](/*controlNode*/ ctx[10], ...args);
 	}
 
 	function mouseenter_handler_1() {
-		return /*mouseenter_handler_1*/ ctx[7](/*controlNode*/ ctx[8]);
+		return /*mouseenter_handler_1*/ ctx[9](/*controlNode*/ ctx[10]);
 	}
 
 	let input_props = { inline: true, label: "Restrict to ID:" };
 
-	if (/*node*/ ctx[0].sendToFilters[/*controlNode*/ ctx[8].id] !== void 0) {
-		input_props.checked = /*node*/ ctx[0].sendToFilters[/*controlNode*/ ctx[8].id];
+	if (/*node*/ ctx[0].sendToFilters[/*controlNode*/ ctx[10].id] !== void 0) {
+		input_props.checked = /*node*/ ctx[0].sendToFilters[/*controlNode*/ ctx[10].id];
 	}
 
 	input = new Input({ props: input_props });
-	binding_callbacks.push(() => bind(input, "checked", input_checked_binding_1));
-	input.$on("change", change_handler_1);
+	binding_callbacks.push(() => bind(input, "checked", input_checked_binding_2));
+	input.$on("change", change_handler_2);
 	input.$on("mouseenter", mouseenter_handler_1);
 
 	return {
@@ -3228,7 +3228,7 @@ function create_default_slot_1(ctx) {
 
 			if (!updating_checked && dirty & /*node, controlNodes*/ 3) {
 				updating_checked = true;
-				input_changes.checked = /*node*/ ctx[0].sendToFilters[/*controlNode*/ ctx[8].id];
+				input_changes.checked = /*node*/ ctx[0].sendToFilters[/*controlNode*/ ctx[10].id];
 				add_flush_callback(() => updating_checked = false);
 			}
 
@@ -3250,7 +3250,7 @@ function create_default_slot_1(ctx) {
 	};
 }
 
-// (42:1) {#each controlNodes as controlNode (controlNode.id)}
+// (48:1) {#each controlNodes as controlNode (controlNode.id)}
 function create_each_block(key_1, ctx) {
 	let first;
 	let input;
@@ -3259,34 +3259,34 @@ function create_each_block(key_1, ctx) {
 	let if_block_anchor;
 	let current;
 
-	function input_checked_binding(value) {
-		/*input_checked_binding*/ ctx[2](value, /*controlNode*/ ctx[8]);
+	function input_checked_binding_1(value) {
+		/*input_checked_binding_1*/ ctx[4](value, /*controlNode*/ ctx[10]);
 	}
 
-	function change_handler(...args) {
-		return /*change_handler*/ ctx[3](/*controlNode*/ ctx[8], ...args);
+	function change_handler_1(...args) {
+		return /*change_handler_1*/ ctx[5](/*controlNode*/ ctx[10], ...args);
 	}
 
 	function mouseenter_handler() {
-		return /*mouseenter_handler*/ ctx[4](/*controlNode*/ ctx[8]);
+		return /*mouseenter_handler*/ ctx[6](/*controlNode*/ ctx[10]);
 	}
 
 	let input_props = {
 		type: "checkbox",
-		label: /*controlNode*/ ctx[8].runtimeId
-		? /*controlNode*/ ctx[8].runtimeId
-		: "Unnamed shuttle (" + /*controlNode*/ ctx[8].id + ")"
+		label: /*controlNode*/ ctx[10].runtimeId
+		? /*controlNode*/ ctx[10].runtimeId
+		: "Unnamed shuttle (" + /*controlNode*/ ctx[10].id + ")"
 	};
 
-	if (/*node*/ ctx[0].sendTo[/*controlNode*/ ctx[8].id] !== void 0) {
-		input_props.checked = /*node*/ ctx[0].sendTo[/*controlNode*/ ctx[8].id];
+	if (/*node*/ ctx[0].sendTo[/*controlNode*/ ctx[10].id] !== void 0) {
+		input_props.checked = /*node*/ ctx[0].sendTo[/*controlNode*/ ctx[10].id];
 	}
 
 	input = new Input({ props: input_props });
-	binding_callbacks.push(() => bind(input, "checked", input_checked_binding));
-	input.$on("change", change_handler);
+	binding_callbacks.push(() => bind(input, "checked", input_checked_binding_1));
+	input.$on("change", change_handler_1);
 	input.$on("mouseenter", mouseenter_handler);
-	let if_block = /*node*/ ctx[0].sendTo[/*controlNode*/ ctx[8].id] && /*controlNode*/ ctx[8].runtimeId === "" && create_if_block(ctx);
+	let if_block = /*node*/ ctx[0].sendTo[/*controlNode*/ ctx[10].id] && /*controlNode*/ ctx[10].runtimeId === "" && create_if_block(ctx);
 
 	return {
 		key: key_1,
@@ -3311,19 +3311,19 @@ function create_each_block(key_1, ctx) {
 			ctx = new_ctx;
 			const input_changes = {};
 
-			if (dirty & /*controlNodes*/ 2) input_changes.label = /*controlNode*/ ctx[8].runtimeId
-			? /*controlNode*/ ctx[8].runtimeId
-			: "Unnamed shuttle (" + /*controlNode*/ ctx[8].id + ")";
+			if (dirty & /*controlNodes*/ 2) input_changes.label = /*controlNode*/ ctx[10].runtimeId
+			? /*controlNode*/ ctx[10].runtimeId
+			: "Unnamed shuttle (" + /*controlNode*/ ctx[10].id + ")";
 
 			if (!updating_checked && dirty & /*node, controlNodes*/ 3) {
 				updating_checked = true;
-				input_changes.checked = /*node*/ ctx[0].sendTo[/*controlNode*/ ctx[8].id];
+				input_changes.checked = /*node*/ ctx[0].sendTo[/*controlNode*/ ctx[10].id];
 				add_flush_callback(() => updating_checked = false);
 			}
 
 			input.$set(input_changes);
 
-			if (/*node*/ ctx[0].sendTo[/*controlNode*/ ctx[8].id] && /*controlNode*/ ctx[8].runtimeId === "") {
+			if (/*node*/ ctx[0].sendTo[/*controlNode*/ ctx[10].id] && /*controlNode*/ ctx[10].runtimeId === "") {
 				if (if_block) {
 					if_block.p(ctx, dirty);
 
@@ -3367,14 +3367,35 @@ function create_each_block(key_1, ctx) {
 	};
 }
 
-// (41:0) <Group label="Listen to:" icon="list" style="padding-top: 0px;">
+// (41:0) <Group label="Send msg.payload to:" icon="list" style="padding-top: 0px;">
 function create_default_slot(ctx) {
+	let input;
+	let updating_checked;
+	let t;
 	let each_blocks = [];
 	let each_1_lookup = new Map();
 	let each_1_anchor;
 	let current;
+
+	function input_checked_binding(value) {
+		/*input_checked_binding*/ ctx[2](value);
+	}
+
+	let input_props = {
+		inline: true,
+		type: "checkbox",
+		label: "Parent instance (controller)"
+	};
+
+	if (/*node*/ ctx[0].sendTo["__PARENT__"] !== void 0) {
+		input_props.checked = /*node*/ ctx[0].sendTo["__PARENT__"];
+	}
+
+	input = new Input({ props: input_props });
+	binding_callbacks.push(() => bind(input, "checked", input_checked_binding));
+	input.$on("change", /*change_handler*/ ctx[3]);
 	let each_value = /*controlNodes*/ ctx[1];
-	const get_key = ctx => /*controlNode*/ ctx[8].id;
+	const get_key = ctx => /*controlNode*/ ctx[10].id;
 
 	for (let i = 0; i < each_value.length; i += 1) {
 		let child_ctx = get_each_context(ctx, each_value, i);
@@ -3384,6 +3405,9 @@ function create_default_slot(ctx) {
 
 	return {
 		c() {
+			create_component(input.$$.fragment);
+			t = space();
+
 			for (let i = 0; i < each_blocks.length; i += 1) {
 				each_blocks[i].c();
 			}
@@ -3391,6 +3415,9 @@ function create_default_slot(ctx) {
 			each_1_anchor = empty();
 		},
 		m(target, anchor) {
+			mount_component(input, target, anchor);
+			insert(target, t, anchor);
+
 			for (let i = 0; i < each_blocks.length; i += 1) {
 				each_blocks[i].m(target, anchor);
 			}
@@ -3399,6 +3426,16 @@ function create_default_slot(ctx) {
 			current = true;
 		},
 		p(ctx, dirty) {
+			const input_changes = {};
+
+			if (!updating_checked && dirty & /*node*/ 1) {
+				updating_checked = true;
+				input_changes.checked = /*node*/ ctx[0].sendTo["__PARENT__"];
+				add_flush_callback(() => updating_checked = false);
+			}
+
+			input.$set(input_changes);
+
 			if (dirty & /*node, controlNodes, RED*/ 3) {
 				each_value = /*controlNodes*/ ctx[1];
 				group_outros();
@@ -3408,6 +3445,7 @@ function create_default_slot(ctx) {
 		},
 		i(local) {
 			if (current) return;
+			transition_in(input.$$.fragment, local);
 
 			for (let i = 0; i < each_value.length; i += 1) {
 				transition_in(each_blocks[i]);
@@ -3416,6 +3454,8 @@ function create_default_slot(ctx) {
 			current = true;
 		},
 		o(local) {
+			transition_out(input.$$.fragment, local);
+
 			for (let i = 0; i < each_blocks.length; i += 1) {
 				transition_out(each_blocks[i]);
 			}
@@ -3423,6 +3463,9 @@ function create_default_slot(ctx) {
 			current = false;
 		},
 		d(detaching) {
+			destroy_component(input, detaching);
+			if (detaching) detach(t);
+
 			for (let i = 0; i < each_blocks.length; i += 1) {
 				each_blocks[i].d(detaching);
 			}
@@ -3438,7 +3481,7 @@ function create_fragment(ctx) {
 
 	group = new Group({
 			props: {
-				label: "Listen to:",
+				label: "Send msg.payload to:",
 				icon: "list",
 				style: "padding-top: 0px;",
 				$$slots: { default: [create_default_slot] },
@@ -3457,7 +3500,7 @@ function create_fragment(ctx) {
 		p(ctx, [dirty]) {
 			const group_changes = {};
 
-			if (dirty & /*$$scope, controlNodes, node*/ 2051) {
+			if (dirty & /*$$scope, controlNodes, node*/ 8195) {
 				group_changes.$$scope = { dirty, ctx };
 			}
 
@@ -3484,7 +3527,7 @@ RED.nodes.registerType("shuttle-send", {
 	color: "#D9A6AB",
 	defaults: {
 		name: { value: "", label: "Name" },
-		sendTo: { value: {} },
+		sendTo: { value: { __PARENT__: true } },
 		sendToFilters: { value: {} }
 	},
 	inputs: 1,
@@ -3515,24 +3558,33 @@ function instance($$self, $$props, $$invalidate) {
 	let controlNodes;
 	let { node } = $$props;
 
-	function input_checked_binding(value, controlNode) {
+	function input_checked_binding(value) {
+		if ($$self.$$.not_equal(node.sendTo["__PARENT__"], value)) {
+			node.sendTo["__PARENT__"] = value;
+			$$invalidate(0, node);
+		}
+	}
+
+	const change_handler = e => $$invalidate(0, node.sendTo["__PARENT__"] = e.detail.value, node);
+
+	function input_checked_binding_1(value, controlNode) {
 		if ($$self.$$.not_equal(node.sendTo[controlNode.id], value)) {
 			node.sendTo[controlNode.id] = value;
 			$$invalidate(0, node);
 		}
 	}
 
-	const change_handler = (controlNode, e) => $$invalidate(0, node.sendTo[controlNode.id] = e.detail.value, node);
+	const change_handler_1 = (controlNode, e) => $$invalidate(0, node.sendTo[controlNode.id] = e.detail.value, node);
 	const mouseenter_handler = controlNode => RED.view.reveal(controlNode.id);
 
-	function input_checked_binding_1(value, controlNode) {
+	function input_checked_binding_2(value, controlNode) {
 		if ($$self.$$.not_equal(node.sendToFilters[controlNode.id], value)) {
 			node.sendToFilters[controlNode.id] = value;
 			$$invalidate(0, node);
 		}
 	}
 
-	const change_handler_1 = (controlNode, e) => $$invalidate(0, node.sendToFilters[controlNode.id] = e.detail.value, node);
+	const change_handler_2 = (controlNode, e) => $$invalidate(0, node.sendToFilters[controlNode.id] = e.detail.value, node);
 	const mouseenter_handler_1 = controlNode => RED.view.reveal(controlNode.id);
 
 	$$self.$$set = $$props => {
@@ -3546,9 +3598,11 @@ function instance($$self, $$props, $$invalidate) {
 		controlNodes,
 		input_checked_binding,
 		change_handler,
-		mouseenter_handler,
 		input_checked_binding_1,
 		change_handler_1,
+		mouseenter_handler,
+		input_checked_binding_2,
+		change_handler_2,
 		mouseenter_handler_1
 	];
 }

@@ -1,4 +1,7 @@
 <script context="module">
+	/*
+	 * TODO: Add option to define a settings-file
+	 */
     RED.nodes.registerType("shuttle-control", {
 		name: { value: "shuttle-control" },
 		category: "Runtime",

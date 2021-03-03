@@ -21,12 +21,9 @@
       "shuttle-send": "src/shuttle-send.js"
     }
   },
-  "dependencies": {
-  },
   "devDependencies": {
     "standard": "^16.0.3",
     "svelte-integration-red": "^0.1.44"
   },
-  "scripts": {
-  }
+  "scripts": {}
 }

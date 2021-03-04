@@ -76,16 +76,17 @@
     if (nrInfo.tags.length === 0) {
         readNrInfo()
     }
+    $: nodeRedVersionOnly = node.nodeRedVersion ? node.nodeRedVersion.substring(node.nodeRedVersion.indexOf(':') + 1) : ''
 </script>
 <Input {node} prop="name" />
 <Select bind:node prop="nodeRedVersion" button="{buttonIcon}" on:click={reloadVersions}>
-    {#if (nrInfo.tags.indexOf(node.nodeRedVersion) === -1 && nrInfo.versions.indexOf(node.nodeRedVersion) === -1)}
-        <option selected value="{node.nodeRedVersion}">{node.nodeRedVersion}</option>
+    {#if (nrInfo.tags.indexOf(nodeRedVersionOnly) === -1 && nrInfo.versions.indexOf(nodeRedVersionOnly) === -1)}
+        <option selected value="{node.nodeRedVersion}">{nodeRedVersionOnly}</option>
     {/if}
     {#each nrInfo.tags as tag}
-	    <option selected={node.nodeRedVersion === tag} value="{tag}">{tag}</option>
+	    <option selected={node.nodeRedVersion === 'tag:' + tag} value="{'tag:' + tag}">{tag}</option>
     {/each}
     {#each nrInfo.versions.reverse() as version}
-	    <option selected={node.nodeRedVersion === version} value="{version}">{version}</option>
+	    <option selected={node.nodeRedVersion === 'version:' + version} value="{'version:' + version}">{version}</option>
     {/each}
 </Select>

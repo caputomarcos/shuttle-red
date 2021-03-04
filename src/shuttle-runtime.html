@@ -3347,27 +3347,26 @@ class Select extends SvelteComponent {
 
 function get_each_context(ctx, list, i) {
 	const child_ctx = ctx.slice();
-	child_ctx[7] = list[i];
+	child_ctx[8] = list[i];
 	return child_ctx;
 }
 
 function get_each_context_1(ctx, list, i) {
 	const child_ctx = ctx.slice();
-	child_ctx[10] = list[i];
+	child_ctx[11] = list[i];
 	return child_ctx;
 }
 
-// (82:4) {#if (nrInfo.tags.indexOf(node.nodeRedVersion) === -1 && nrInfo.versions.indexOf(node.nodeRedVersion) === -1)}
+// (83:4) {#if (nrInfo.tags.indexOf(nodeRedVersionOnly) === -1 && nrInfo.versions.indexOf(nodeRedVersionOnly) === -1)}
 function create_if_block(ctx) {
 	let option;
-	let t_value = /*node*/ ctx[0].nodeRedVersion + "";
 	let t;
 	let option_value_value;
 
 	return {
 		c() {
 			option = element("option");
-			t = text(t_value);
+			t = text(/*nodeRedVersionOnly*/ ctx[3]);
 			option.selected = true;
 			option.__value = option_value_value = /*node*/ ctx[0].nodeRedVersion;
 			option.value = option.__value;
@@ -3377,7 +3376,7 @@ function create_if_block(ctx) {
 			append(option, t);
 		},
 		p(ctx, dirty) {
-			if (dirty & /*node*/ 1 && t_value !== (t_value = /*node*/ ctx[0].nodeRedVersion + "")) set_data(t, t_value);
+			if (dirty & /*nodeRedVersionOnly*/ 8) set_data(t, /*nodeRedVersionOnly*/ ctx[3]);
 
 			if (dirty & /*node*/ 1 && option_value_value !== (option_value_value = /*node*/ ctx[0].nodeRedVersion)) {
 				option.__value = option_value_value;
@@ -3390,10 +3389,10 @@ function create_if_block(ctx) {
 	};
 }
 
-// (85:4) {#each nrInfo.tags as tag}
+// (86:4) {#each nrInfo.tags as tag}
 function create_each_block_1(ctx) {
 	let option;
-	let t_value = /*tag*/ ctx[10] + "";
+	let t_value = /*tag*/ ctx[11] + "";
 	let t;
 	let option_selected_value;
 	let option_value_value;
@@ -3402,8 +3401,8 @@ function create_each_block_1(ctx) {
 		c() {
 			option = element("option");
 			t = text(t_value);
-			option.selected = option_selected_value = /*node*/ ctx[0].nodeRedVersion === /*tag*/ ctx[10];
-			option.__value = option_value_value = /*tag*/ ctx[10];
+			option.selected = option_selected_value = /*node*/ ctx[0].nodeRedVersion === "tag:" + /*tag*/ ctx[11];
+			option.__value = option_value_value = "tag:" + /*tag*/ ctx[11];
 			option.value = option.__value;
 		},
 		m(target, anchor) {
@@ -3411,13 +3410,13 @@ function create_each_block_1(ctx) {
 			append(option, t);
 		},
 		p(ctx, dirty) {
-			if (dirty & /*nrInfo*/ 2 && t_value !== (t_value = /*tag*/ ctx[10] + "")) set_data(t, t_value);
+			if (dirty & /*nrInfo*/ 2 && t_value !== (t_value = /*tag*/ ctx[11] + "")) set_data(t, t_value);
 
-			if (dirty & /*node, nrInfo*/ 3 && option_selected_value !== (option_selected_value = /*node*/ ctx[0].nodeRedVersion === /*tag*/ ctx[10])) {
+			if (dirty & /*node, nrInfo*/ 3 && option_selected_value !== (option_selected_value = /*node*/ ctx[0].nodeRedVersion === "tag:" + /*tag*/ ctx[11])) {
 				option.selected = option_selected_value;
 			}
 
-			if (dirty & /*nrInfo*/ 2 && option_value_value !== (option_value_value = /*tag*/ ctx[10])) {
+			if (dirty & /*nrInfo*/ 2 && option_value_value !== (option_value_value = "tag:" + /*tag*/ ctx[11])) {
 				option.__value = option_value_value;
 				option.value = option.__value;
 			}
@@ -3428,10 +3427,10 @@ function create_each_block_1(ctx) {
 	};
 }
 
-// (88:4) {#each nrInfo.versions.reverse() as version}
+// (89:4) {#each nrInfo.versions.reverse() as version}
 function create_each_block(ctx) {
 	let option;
-	let t_value = /*version*/ ctx[7] + "";
+	let t_value = /*version*/ ctx[8] + "";
 	let t;
 	let option_selected_value;
 	let option_value_value;
@@ -3440,8 +3439,8 @@ function create_each_block(ctx) {
 		c() {
 			option = element("option");
 			t = text(t_value);
-			option.selected = option_selected_value = /*node*/ ctx[0].nodeRedVersion === /*version*/ ctx[7];
-			option.__value = option_value_value = /*version*/ ctx[7];
+			option.selected = option_selected_value = /*node*/ ctx[0].nodeRedVersion === "version:" + /*version*/ ctx[8];
+			option.__value = option_value_value = "version:" + /*version*/ ctx[8];
 			option.value = option.__value;
 		},
 		m(target, anchor) {
@@ -3449,13 +3448,13 @@ function create_each_block(ctx) {
 			append(option, t);
 		},
 		p(ctx, dirty) {
-			if (dirty & /*nrInfo*/ 2 && t_value !== (t_value = /*version*/ ctx[7] + "")) set_data(t, t_value);
+			if (dirty & /*nrInfo*/ 2 && t_value !== (t_value = /*version*/ ctx[8] + "")) set_data(t, t_value);
 
-			if (dirty & /*node, nrInfo*/ 3 && option_selected_value !== (option_selected_value = /*node*/ ctx[0].nodeRedVersion === /*version*/ ctx[7])) {
+			if (dirty & /*node, nrInfo*/ 3 && option_selected_value !== (option_selected_value = /*node*/ ctx[0].nodeRedVersion === "version:" + /*version*/ ctx[8])) {
 				option.selected = option_selected_value;
 			}
 
-			if (dirty & /*nrInfo*/ 2 && option_value_value !== (option_value_value = /*version*/ ctx[7])) {
+			if (dirty & /*nrInfo*/ 2 && option_value_value !== (option_value_value = "version:" + /*version*/ ctx[8])) {
 				option.__value = option_value_value;
 				option.value = option.__value;
 			}
@@ -3466,9 +3465,9 @@ function create_each_block(ctx) {
 	};
 }
 
-// (81:0) <Select bind:node prop="nodeRedVersion" button="{buttonIcon}" on:click={reloadVersions}>
+// (82:0) <Select bind:node prop="nodeRedVersion" button="{buttonIcon}" on:click={reloadVersions}>
 function create_default_slot(ctx) {
-	let show_if = /*nrInfo*/ ctx[1].tags.indexOf(/*node*/ ctx[0].nodeRedVersion) === -1 && /*nrInfo*/ ctx[1].versions.indexOf(/*node*/ ctx[0].nodeRedVersion) === -1;
+	let show_if = /*nrInfo*/ ctx[1].tags.indexOf(/*nodeRedVersionOnly*/ ctx[3]) === -1 && /*nrInfo*/ ctx[1].versions.indexOf(/*nodeRedVersionOnly*/ ctx[3]) === -1;
 	let t0;
 	let t1;
 	let each1_anchor;
@@ -3521,7 +3520,7 @@ function create_default_slot(ctx) {
 			insert(target, each1_anchor, anchor);
 		},
 		p(ctx, dirty) {
-			if (dirty & /*nrInfo, node*/ 3) show_if = /*nrInfo*/ ctx[1].tags.indexOf(/*node*/ ctx[0].nodeRedVersion) === -1 && /*nrInfo*/ ctx[1].versions.indexOf(/*node*/ ctx[0].nodeRedVersion) === -1;
+			if (dirty & /*nrInfo, nodeRedVersionOnly*/ 10) show_if = /*nrInfo*/ ctx[1].tags.indexOf(/*nodeRedVersionOnly*/ ctx[3]) === -1 && /*nrInfo*/ ctx[1].versions.indexOf(/*nodeRedVersionOnly*/ ctx[3]) === -1;
 
 			if (show_if) {
 				if (if_block) {
@@ -3605,7 +3604,7 @@ function create_fragment(ctx) {
 		});
 
 	function select_node_binding(value) {
-		/*select_node_binding*/ ctx[4](value);
+		/*select_node_binding*/ ctx[5](value);
 	}
 
 	let select_props = {
@@ -3621,7 +3620,7 @@ function create_fragment(ctx) {
 
 	select = new Select({ props: select_props });
 	binding_callbacks.push(() => bind(select, "node", select_node_binding));
-	select.$on("click", /*reloadVersions*/ ctx[3]);
+	select.$on("click", /*reloadVersions*/ ctx[4]);
 
 	return {
 		c() {
@@ -3642,7 +3641,7 @@ function create_fragment(ctx) {
 			const select_changes = {};
 			if (dirty & /*buttonIcon*/ 4) select_changes.button = /*buttonIcon*/ ctx[2];
 
-			if (dirty & /*$$scope, nrInfo, node*/ 8195) {
+			if (dirty & /*$$scope, nrInfo, node, nodeRedVersionOnly*/ 16395) {
 				select_changes.$$scope = { dirty, ctx };
 			}
 
@@ -3710,6 +3709,7 @@ RED.nodes.registerType("shuttle-runtime", {
 });
 
 function instance($$self, $$props, $$invalidate) {
+	let nodeRedVersionOnly;
 	let { node } = $$props;
 
 	// The auth token is needed to access to the HTTP API
@@ -3763,7 +3763,22 @@ function instance($$self, $$props, $$invalidate) {
 		if ("node" in $$props) $$invalidate(0, node = $$props.node);
 	};
 
-	return [node, nrInfo, buttonIcon, reloadVersions, select_node_binding];
+	$$self.$$.update = () => {
+		if ($$self.$$.dirty & /*node*/ 1) {
+			$$invalidate(3, nodeRedVersionOnly = node.nodeRedVersion
+			? node.nodeRedVersion.substring(node.nodeRedVersion.indexOf(":") + 1)
+			: "");
+		}
+	};
+
+	return [
+		node,
+		nrInfo,
+		buttonIcon,
+		nodeRedVersionOnly,
+		reloadVersions,
+		select_node_binding
+	];
 }
 
 class Shuttle_runtime extends SvelteComponent {

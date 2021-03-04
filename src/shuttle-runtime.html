@@ -3682,6 +3682,7 @@ RED.nodes.registerType("shuttle-runtime", {
 			value: "latest",
 			label: "Node-RED version"
 		},
+		// TODO
 		settings: { value: "", label: "Settings file" }
 	},
 	inputs: 0,
@@ -3760,12 +3761,6 @@ function instance($$self, $$props, $$invalidate) {
 
 	$$self.$$set = $$props => {
 		if ("node" in $$props) $$invalidate(0, node = $$props.node);
-	};
-
-	$$self.$$.update = () => {
-		if ($$self.$$.dirty & /*node*/ 1) {
-			console.log(node.nodeRedVersion);
-		}
 	};
 
 	return [node, nrInfo, buttonIcon, reloadVersions, select_node_binding];

@@ -76,7 +76,6 @@
     if (nrInfo.tags.length === 0) {
         readNrInfo()
     }
-    $: console.log(node.nodeRedVersion)
 </script>
 <Input {node} prop="name" />
 <Select bind:node prop="nodeRedVersion" button="{buttonIcon}" on:click={reloadVersions}>

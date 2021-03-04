@@ -1,4 +1,5 @@
 const { spawn } = require('child_process')
+const path = require('path')
 
 const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm'
 
@@ -62,12 +63,12 @@ async function versions () {
   return nodeRedInfo
 }
 
-async function install (versionOrTag) {
-  await exec(npmCmd, ['install', '--prefix', './node-red/' + versionOrTag, 'node-red@' + versionOrTag])
+async function install (versionOrTag, directory='./node-red/') {
+  await exec(npmCmd, ['install', '--prefix', path.join(directory, versionOrTag), 'node-red@' + versionOrTag])
 }
 
-async function update (tag) {
-  await exec(npmCmd, ['update', '--prefix', './node-red/' + tag, 'node-red@' + tag])
+async function update (tag, directory='./node-red/') {
+  await exec(npmCmd, ['update', '--prefix', path.join(directory, tag), 'node-red@' + tag])
 }
 
 module.exports = {

@@ -3,7 +3,10 @@ const npm = require('./util/npm')
 module.exports = function (RED) {
     function ShuttleRuntimeNode (config) {
         RED.nodes.createNode(this, config)
-        // const node = this
+        const node = this
+        node.name = config.name
+        node.version = config.nodeRedVersion
+        node.settings = config.settings
     }
 
     RED.nodes.registerType('shuttle-runtime', ShuttleRuntimeNode)

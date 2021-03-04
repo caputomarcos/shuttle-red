@@ -1,6 +1,6 @@
 <script context="module">
 	/*
-	 * TODO: Add option to define a settings-file
+	 * TODO: Add option to define environment variables
 	 */
     RED.nodes.registerType("shuttle-runtime", {
 		name: { value: "shuttle-runtime" },

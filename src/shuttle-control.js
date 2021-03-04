@@ -1,7 +1,18 @@
+const npm = require('./util/npm')
+const fs = require('fs')
+const path = require('path')
+const { fork } = require('child_process')
+
 module.exports = function (RED) {
   function ShuttleControlNode (config) {
     RED.nodes.createNode(this, config)
-    // const node = this
+    const node = this
+    node.name = config.name
+    node.action = config.action
+    node.runtime = RED.nodes.getNode(config.runtime)
+    node.project = config.project
+
+    const userDir = RED.settings.userDir
 
     /*
      * Starting a new runtime:
@@ -13,6 +24,87 @@ module.exports = function (RED) {
      * 4. Create symbolic link inside the projects directory linking to the project that should be started
      * 5. Run node ./node-red/<version or tag>/node_modules/node-red/red.js -u ./runtime/<id>/ <project name> using child_process.fork()
      */
+    async function start (msg, send) {
+      const nodeRedVersion = node.runtime.version.substring(node.runtime.version.indexOf(':') + 1)
+      const versionIsTag = node.runtime.version.startsWith('tag:')
+      // Check if directory structure has been initialized
+      const shuttleDir = path.join(userDir, 'shuttle-red')
+      const nodeRedDir = path.join(shuttleDir, 'node-red')
+      const nodeRedVersionDir = path.join(nodeRedDir, nodeRedVersion)
+      const nodeRedRuntime = path.join(nodeRedVersionDir, 'node_modules', 'node-red', 'red.js')
+      const runtimeDir = path.join(shuttleDir, 'runtime')
+      const instanceDir = path.join(runtimeDir, node.name)
+      const projectsDir = path.join(userDir, 'projects')
+      const linkTo = path.join(projectsDir, node.project)
+      const linkFrom = path.join(instanceDir, 'projects', node.project)
+      const shuttleDirExists = fs.existsSync(shuttleDir) && fs.existsSync(nodeRedDir)  && fs.existsSync(runtimeDir)
+      if (!shuttleDirExists) {
+        fs.mkdirSync(nodeRedDir, { recursive: true })
+        fs.mkdirSync(runtimeDir, { recursive: true })
+      }
+      // Check if node-red version is already installed
+      const isAlreadyInstalled = fs.existsSync(nodeRedVersionDir)
+      if (!isAlreadyInstalled) {
+        await npm.install(nodeRedVersion, nodeRedDir)
+      } else if (versionIsTag) {
+        // Check if the node-red version can be updated (is it a tag?)
+        await npm.update(nodeRedVersion, nodeRedDir)
+      }
+      // Create symbolic link
+      if (!fs.existsSync(linkTo)) {
+        node.error('Could not start runtime: Project "' + node.project + '" does not exist.')
+        return
+      }
+      if (!fs.existsSync(linkFrom)) {
+        fs.mkdirSync(linkFrom, { recursive: true })
+        fs.symlinkSync(linkTo, linkFrom)
+      }
+      // Run node
+      return fork(
+        nodeRedRuntime,
+        ['-u', instanceDir, node.project],
+        {
+          execPath: instanceDir
+        }
+      )
+    }
+
+    async function stop (msg, send){
+      // TODO
+    }
+
+    node.on('input', function (msg, send, done) {
+      switch(node.action) {
+        case 'start': {
+          start(msg, send).then((shuttleInfo) => {
+            node.warn(shuttleInfo)
+            // TODO: Save shuttle info for later reference
+            done()
+          }).catch((error) => {
+            // TODO: Implement proper error handling
+            console.log(error)
+          })
+          break
+        }
+        case 'restart': {
+          stop(msg, send).then(() => {
+            runStart(msg, send)
+          }).then(() => {
+            done()
+          })
+          break
+        }
+        case 'stop': {
+          stop(msg, send).then(() => {
+            done()
+          })
+          break
+        }
+        default: {
+          node.error('Error: Unknown action "' + node.action + "'.")
+        }
+      }
+    })
   }
   RED.nodes.registerType('shuttle-control', ShuttleControlNode)
 }

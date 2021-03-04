@@ -17,6 +17,7 @@
   "node-red": {
     "nodes": {
       "shuttle-control": "src/shuttle-control.js",
+      "shuttle-runtime": "src/shuttle-runtime.js",
       "shuttle-receive": "src/shuttle-receive.js",
       "shuttle-send": "src/shuttle-send.js"
     }

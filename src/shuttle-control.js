@@ -50,8 +50,9 @@ module.exports = function (RED) {
      */
     async function start (msg, send) {
       // TODO: The ID might be determined dynamically
-      if (shuttles.hasOwnProperty(node.name)) {
-        throw new Error('Could not start shuttle: An instance with the ID "' + node.name + '" is already running.')
+      const shuttleId = node.name
+      if (shuttles.hasOwnProperty(shuttleId)) {
+        throw new Error('Could not start shuttle: An instance with the ID "' + shuttleId + '" is already running.')
       }
       // Check if directory structure has been initialized
       const shuttleDirExists = fs.existsSync(shuttleDir) && fs.existsSync(nodeRedDir)  && fs.existsSync(runtimeDir)
@@ -73,10 +74,9 @@ module.exports = function (RED) {
         // Create symbolic link to shuttle-RED module
         fs.symlinkSync(modulesShuttleRedDir, instanceShuttleRedDir)
         // Create projects file
-        // TODO: The ID might be determined dynamically
         fs.writeFileSync(instanceProjectFile, `
           {
-            "name": "shuttle ${node.name}",
+            "name": "shuttle ${shuttleId}",
             "description": "A Node-RED instance started from within Node-RED. We call it a shuttle.",
             "author": "The shuttle-RED commander :o)",
             "version": "1.0.0",

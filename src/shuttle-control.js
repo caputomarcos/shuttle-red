@@ -23,13 +23,26 @@ module.exports = function (RED) {
     }
     const shuttles = this.context().flow.get('shuttles')
 
+    const listener = []
+
+    // If shuttles are already running, we need to activate the listeners
+    if (Object.keys(shuttles).length > 0) {
+      Object.keys(shuttles).forEach((shuttleId) => {
+        shuttles[shuttleId].on('message', (message) => {
+          listener.forEach((receive) => {
+            receive(message, shuttleId)
+          })
+        })
+      })
+    }
+
+    // Some helper methods for send & receive
     node.getRunningShuttles = () => Object.keys(shuttles)
     node.sendTo = (shuttleId, msg) => {
       shuttles[shuttleId]?.send(msg)
     }
-    node.messageListener = []
     node.onMessage = (callback) => {
-      node.messageListener.push(callback)
+      listener.push(callback)
     }
 
     const nodeRedVersion = node.runtime.version.substring(node.runtime.version.indexOf(':') + 1)
@@ -62,7 +75,7 @@ module.exports = function (RED) {
      * 4. Create symbolic link inside the projects directory linking to the project that should be started
      * 5. Run node ./node-red/<version or tag>/node_modules/node-red/red.js -u ./runtime/<id>/ <project name> using child_process.fork()
      */
-    async function start (shuttleId, _msg) {
+    async function start (shuttleId, port, _msg) {
       if (shuttles.hasOwnProperty(shuttleId)) {
         throw new Error('Could not start shuttle: An instance with the ID "' + shuttleId + '" is already running.')
       }
@@ -109,7 +122,7 @@ module.exports = function (RED) {
       // TODO determine parameters from msg (if set to dynamic in node properties)
       const shuttleProcess = fork(
         nodeRedRuntime,
-        ['-u', instanceDir, '-p', node.port, node.project],
+        ['-u', instanceDir, '-p', port, node.project],
         {
           silent: true
         }
@@ -125,7 +138,7 @@ module.exports = function (RED) {
       })
       // Route message
       shuttleProcess.on('message', (message) => {
-        node.messageListener.forEach((receive) => {
+        listener.forEach((receive) => {
           receive(message, shuttleId)
         })
       })
@@ -145,7 +158,7 @@ module.exports = function (RED) {
 
       switch (node.action) {
         case 'start': {
-          start(shuttle_id, msg, send).then((shuttleProcess) => {
+          start(shuttle_id, node.port, msg).then((shuttleProcess) => {
             if (!shuttleProcess) {
               msg.payload = { shuttle_id, started: false }
               send(msg)
@@ -165,33 +178,35 @@ module.exports = function (RED) {
           break
         }
         case 'restart': {
-          function handleStart (shuttleId, msg, send, done) {
-            start(shuttleId, msg).then((shuttleProcess) => {
-              if (!shuttleProcess) {
-                msg.payload = { shuttle_id, started: false }
-                send(msg)
-                done()
-              } else {
-                shuttles[shuttleId] = shuttleProcess
-                msg.payload = { shuttle_id, started: shuttleProcess.connected }
-                send(msg)
-                done()
-              }
-            })
-          }
-          stop(shuttle_id, msg).then(() => {
-            // Instance could be stopped
-            handleStart(shuttle_id, msg, send, done)
-          }, () => {
-            // Instance could not be stopped
-            node.warn('Warning: Could not stop shuttle. Instance "' + shuttle_id + '" was not running.')
-            handleStart(shuttle_id, msg, send, done)
-          }).catch((error) => {
-            node.error(error)
+          if (!shuttles[shuttle_id]) {
+            node.error('Error: Could not restart shuttle. No instance "' + shuttle_id + '" is running.')
             msg.payload = { shuttle_id, started: false }
             send(msg)
             done()
-          })
+          } else {
+            const port = shuttles[shuttle_id].spawnargs[5]
+            stop(shuttle_id, msg).then(() => {
+              // Instance could be stopped
+              delete shuttles[shuttle_id]
+              start(shuttle_id, port, msg).then((shuttleProcess) => {
+                if (!shuttleProcess) {
+                  msg.payload = { shuttle_id, started: false }
+                  send(msg)
+                  done()
+                } else {
+                  shuttles[shuttle_id] = shuttleProcess
+                  msg.payload = { shuttle_id, started: shuttleProcess.connected }
+                  send(msg)
+                  done()
+                }
+              })
+            }).catch((error) => {
+              node.error(error)
+              msg.payload = { shuttle_id, started: false }
+              send(msg)
+              done()
+            })
+          }
           break
         }
         case 'stop': {

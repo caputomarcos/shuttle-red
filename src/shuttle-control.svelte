@@ -88,12 +88,12 @@
 </script>
 <Input {node} prop="name" placeholder='project name if not defined' />
 <Input {node} type="config" prop="runtime" />
-<Select bind:node prop="action">
+<Select {node} prop="action" on:change={(e) => node.action = e.detail.value}>
 	<option value="start">Start runtime</option>
 	<option value="stop">Stop runtime</option>
 	<option value="restart">Restart runtime</option>
 </Select>
-<Select bind:node prop="project" button="{buttonIcon}" on:click={reloadProjects}>
+<Select {node} prop="project" button="{buttonIcon}" on:click={reloadProjects}>
 	<option selected={node.project === "__MSG.PAYLOAD__"} value="__MSG.PAYLOAD__">Determine from msg.payload</option>
 	<option selected={node.project === "__MSG.PROJECT__"} value="__MSG.PROJECT__">Determine from msg.project</option>
 	<option selected={node.project === "__EMPTY__"} value="__EMPTY__">Empty project</option>
@@ -101,4 +101,6 @@
 	    <option selected={node.project === project} value="{project}">{project}</option>
     {/each}
 </Select>
-<TypedInput {node} prop="port" typeProp="portType" types={portTypes} />
+{#if node.action === 'start'}
+	<TypedInput {node} prop="port" typeProp="portType" types={portTypes} />
+{/if}

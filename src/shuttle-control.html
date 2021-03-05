@@ -614,7 +614,7 @@ function create_else_block_1$1(ctx) {
 }
 
 // (50:0) {#if !updateNode || prop}
-function create_if_block$5(ctx) {
+function create_if_block$6(ctx) {
 	let t;
 	let if_block1_anchor;
 	let if_block0 = /*type*/ ctx[2] !== "checkbox" && /*label*/ ctx[3] && create_if_block_8(ctx);
@@ -1191,7 +1191,7 @@ function create_fragment$6(ctx) {
 	let if_block_anchor;
 
 	function select_block_type(ctx, dirty) {
-		if (!/*updateNode*/ ctx[8] || /*prop*/ ctx[5]) return create_if_block$5;
+		if (!/*updateNode*/ ctx[8] || /*prop*/ ctx[5]) return create_if_block$6;
 		return create_else_block_1$1;
 	}
 
@@ -1494,7 +1494,7 @@ function create_else_block$3(ctx) {
 }
 
 // (71:0) {#if prop}
-function create_if_block$4(ctx) {
+function create_if_block$5(ctx) {
 	let label_1;
 	let t0;
 	let t1;
@@ -1711,7 +1711,7 @@ function create_fragment$5(ctx) {
 	let if_block_anchor;
 
 	function select_block_type(ctx, dirty) {
-		if (/*prop*/ ctx[2]) return create_if_block$4;
+		if (/*prop*/ ctx[2]) return create_if_block$5;
 		return create_else_block$3;
 	}
 
@@ -1934,7 +1934,7 @@ function create_else_block_1(ctx) {
 }
 
 // (21:0) {#if inline}
-function create_if_block$3(ctx) {
+function create_if_block$4(ctx) {
 	let current_block_type_index;
 	let if_block;
 	let if_block_anchor;
@@ -2602,7 +2602,7 @@ function create_fragment$4(ctx) {
 	let if_block;
 	let if_block_anchor;
 	let current;
-	const if_block_creators = [create_if_block$3, create_else_block_1];
+	const if_block_creators = [create_if_block$4, create_else_block_1];
 	const if_blocks = [];
 
 	function select_block_type(ctx, dirty) {
@@ -3015,7 +3015,7 @@ function create_if_block_2(ctx) {
 }
 
 // (63:0) {#if !updateNode || (prop && typeProp)}
-function create_if_block$2(ctx) {
+function create_if_block$3(ctx) {
 	let label_1;
 	let t0;
 	let t1;
@@ -3155,7 +3155,7 @@ function create_fragment$3(ctx) {
 	let if_block_anchor;
 
 	function select_block_type(ctx, dirty) {
-		if (!/*updateNode*/ ctx[8] || /*prop*/ ctx[4] && /*typeProp*/ ctx[5]) return create_if_block$2;
+		if (!/*updateNode*/ ctx[8] || /*prop*/ ctx[4] && /*typeProp*/ ctx[5]) return create_if_block$3;
 		if (/*prop*/ ctx[4]) return create_if_block_2;
 		if (/*typeProp*/ ctx[5]) return create_if_block_3;
 		return create_else_block$1;
@@ -3403,7 +3403,7 @@ function create_else_block(ctx) {
 }
 
 // (12:0) {#if inline}
-function create_if_block$1(ctx) {
+function create_if_block$2(ctx) {
 	let plaintypedinput;
 	let updating_node;
 	let updating_prop;
@@ -3723,7 +3723,7 @@ function create_fragment$2(ctx) {
 	let if_block;
 	let if_block_anchor;
 	let current;
-	const if_block_creators = [create_if_block$1, create_else_block];
+	const if_block_creators = [create_if_block$2, create_else_block];
 	const if_blocks = [];
 
 	function select_block_type(ctx, dirty) {
@@ -3993,7 +3993,7 @@ function create_if_block_1(ctx) {
 }
 
 // (43:8) {#if button !== false}
-function create_if_block(ctx) {
+function create_if_block$1(ctx) {
 	let a;
 	let i;
 	let i_class_value;
@@ -4064,7 +4064,7 @@ function create_default_slot$1(ctx) {
 	let if_block0 = /*icon*/ ctx[5] && create_if_block_1(ctx);
 	const default_slot_template = /*#slots*/ ctx[9].default;
 	const default_slot = create_slot(default_slot_template, ctx, /*$$scope*/ ctx[14], null);
-	let if_block1 = /*button*/ ctx[6] !== false && create_if_block(ctx);
+	let if_block1 = /*button*/ ctx[6] !== false && create_if_block$1(ctx);
 
 	return {
 		c() {
@@ -4171,7 +4171,7 @@ function create_default_slot$1(ctx) {
 				if (if_block1) {
 					if_block1.p(ctx, dirty);
 				} else {
-					if_block1 = create_if_block(ctx);
+					if_block1 = create_if_block$1(ctx);
 					if_block1.c();
 					if_block1.m(div1, null);
 				}
@@ -4361,11 +4361,11 @@ class Select extends SvelteComponent {
 
 function get_each_context(ctx, list, i) {
 	const child_ctx = ctx.slice();
-	child_ctx[9] = list[i];
+	child_ctx[8] = list[i];
 	return child_ctx;
 }
 
-// (91:0) <Select bind:node prop="action">
+// (91:0) <Select {node} prop="action" on:change={(e) => node.action = e.detail.value}>
 function create_default_slot_1(ctx) {
 	let option0;
 	let t1;
@@ -4410,7 +4410,7 @@ function create_default_slot_1(ctx) {
 // (100:1) {#each projects as project}
 function create_each_block(ctx) {
 	let option;
-	let t_value = /*project*/ ctx[9] + "";
+	let t_value = /*project*/ ctx[8] + "";
 	let t;
 	let option_selected_value;
 	let option_value_value;
@@ -4419,8 +4419,8 @@ function create_each_block(ctx) {
 		c() {
 			option = element("option");
 			t = text(t_value);
-			option.selected = option_selected_value = /*node*/ ctx[0].project === /*project*/ ctx[9];
-			option.__value = option_value_value = /*project*/ ctx[9];
+			option.selected = option_selected_value = /*node*/ ctx[0].project === /*project*/ ctx[8];
+			option.__value = option_value_value = /*project*/ ctx[8];
 			option.value = option.__value;
 		},
 		m(target, anchor) {
@@ -4428,13 +4428,13 @@ function create_each_block(ctx) {
 			append(option, t);
 		},
 		p(ctx, dirty) {
-			if (dirty & /*projects*/ 2 && t_value !== (t_value = /*project*/ ctx[9] + "")) set_data(t, t_value);
+			if (dirty & /*projects*/ 2 && t_value !== (t_value = /*project*/ ctx[8] + "")) set_data(t, t_value);
 
-			if (dirty & /*node, projects*/ 3 && option_selected_value !== (option_selected_value = /*node*/ ctx[0].project === /*project*/ ctx[9])) {
+			if (dirty & /*node, projects*/ 3 && option_selected_value !== (option_selected_value = /*node*/ ctx[0].project === /*project*/ ctx[8])) {
 				option.selected = option_selected_value;
 			}
 
-			if (dirty & /*projects*/ 2 && option_value_value !== (option_value_value = /*project*/ ctx[9])) {
+			if (dirty & /*projects*/ 2 && option_value_value !== (option_value_value = /*project*/ ctx[8])) {
 				option.__value = option_value_value;
 				option.value = option.__value;
 			}
@@ -4445,7 +4445,7 @@ function create_each_block(ctx) {
 	};
 }
 
-// (96:0) <Select bind:node prop="project" button="{buttonIcon}" on:click={reloadProjects}>
+// (96:0) <Select {node} prop="project" button="{buttonIcon}" on:click={reloadProjects}>
 function create_default_slot(ctx) {
 	let option0;
 	let t0;
@@ -4560,18 +4560,58 @@ function create_default_slot(ctx) {
 	};
 }
 
+// (104:0) {#if node.action === 'start'}
+function create_if_block(ctx) {
+	let typedinput;
+	let current;
+
+	typedinput = new TypedInput({
+			props: {
+				node: /*node*/ ctx[0],
+				prop: "port",
+				typeProp: "portType",
+				types: /*portTypes*/ ctx[4]
+			}
+		});
+
+	return {
+		c() {
+			create_component(typedinput.$$.fragment);
+		},
+		m(target, anchor) {
+			mount_component(typedinput, target, anchor);
+			current = true;
+		},
+		p(ctx, dirty) {
+			const typedinput_changes = {};
+			if (dirty & /*node*/ 1) typedinput_changes.node = /*node*/ ctx[0];
+			typedinput.$set(typedinput_changes);
+		},
+		i(local) {
+			if (current) return;
+			transition_in(typedinput.$$.fragment, local);
+			current = true;
+		},
+		o(local) {
+			transition_out(typedinput.$$.fragment, local);
+			current = false;
+		},
+		d(detaching) {
+			destroy_component(typedinput, detaching);
+		}
+	};
+}
+
 function create_fragment(ctx) {
 	let input0;
 	let t0;
 	let input1;
 	let t1;
 	let select0;
-	let updating_node;
 	let t2;
 	let select1;
-	let updating_node_1;
 	let t3;
-	let typedinput;
+	let if_block_anchor;
 	let current;
 
 	input0 = new Input({
@@ -4590,50 +4630,29 @@ function create_fragment(ctx) {
 			}
 		});
 
-	function select0_node_binding(value) {
-		/*select0_node_binding*/ ctx[5](value);
-	}
-
-	let select0_props = {
-		prop: "action",
-		$$slots: { default: [create_default_slot_1] },
-		$$scope: { ctx }
-	};
-
-	if (/*node*/ ctx[0] !== void 0) {
-		select0_props.node = /*node*/ ctx[0];
-	}
-
-	select0 = new Select({ props: select0_props });
-	binding_callbacks.push(() => bind(select0, "node", select0_node_binding));
-
-	function select1_node_binding(value) {
-		/*select1_node_binding*/ ctx[6](value);
-	}
-
-	let select1_props = {
-		prop: "project",
-		button: /*buttonIcon*/ ctx[2],
-		$$slots: { default: [create_default_slot] },
-		$$scope: { ctx }
-	};
-
-	if (/*node*/ ctx[0] !== void 0) {
-		select1_props.node = /*node*/ ctx[0];
-	}
-
-	select1 = new Select({ props: select1_props });
-	binding_callbacks.push(() => bind(select1, "node", select1_node_binding));
-	select1.$on("click", /*reloadProjects*/ ctx[3]);
-
-	typedinput = new TypedInput({
+	select0 = new Select({
 			props: {
 				node: /*node*/ ctx[0],
-				prop: "port",
-				typeProp: "portType",
-				types: /*portTypes*/ ctx[4]
+				prop: "action",
+				$$slots: { default: [create_default_slot_1] },
+				$$scope: { ctx }
 			}
 		});
+
+	select0.$on("change", /*change_handler*/ ctx[5]);
+
+	select1 = new Select({
+			props: {
+				node: /*node*/ ctx[0],
+				prop: "project",
+				button: /*buttonIcon*/ ctx[2],
+				$$slots: { default: [create_default_slot] },
+				$$scope: { ctx }
+			}
+		});
+
+	select1.$on("click", /*reloadProjects*/ ctx[3]);
+	let if_block = /*node*/ ctx[0].action === "start" && create_if_block(ctx);
 
 	return {
 		c() {
@@ -4645,7 +4664,8 @@ function create_fragment(ctx) {
 			t2 = space();
 			create_component(select1.$$.fragment);
 			t3 = space();
-			create_component(typedinput.$$.fragment);
+			if (if_block) if_block.c();
+			if_block_anchor = empty();
 		},
 		m(target, anchor) {
 			mount_component(input0, target, anchor);
@@ -4656,7 +4676,8 @@ function create_fragment(ctx) {
 			insert(target, t2, anchor);
 			mount_component(select1, target, anchor);
 			insert(target, t3, anchor);
-			mount_component(typedinput, target, anchor);
+			if (if_block) if_block.m(target, anchor);
+			insert(target, if_block_anchor, anchor);
 			current = true;
 		},
 		p(ctx, [dirty]) {
@@ -4667,35 +4688,45 @@ function create_fragment(ctx) {
 			if (dirty & /*node*/ 1) input1_changes.node = /*node*/ ctx[0];
 			input1.$set(input1_changes);
 			const select0_changes = {};
+			if (dirty & /*node*/ 1) select0_changes.node = /*node*/ ctx[0];
 
-			if (dirty & /*$$scope*/ 4096) {
+			if (dirty & /*$$scope*/ 2048) {
 				select0_changes.$$scope = { dirty, ctx };
-			}
-
-			if (!updating_node && dirty & /*node*/ 1) {
-				updating_node = true;
-				select0_changes.node = /*node*/ ctx[0];
-				add_flush_callback(() => updating_node = false);
 			}
 
 			select0.$set(select0_changes);
 			const select1_changes = {};
+			if (dirty & /*node*/ 1) select1_changes.node = /*node*/ ctx[0];
 			if (dirty & /*buttonIcon*/ 4) select1_changes.button = /*buttonIcon*/ ctx[2];
 
-			if (dirty & /*$$scope, projects, node*/ 4099) {
+			if (dirty & /*$$scope, projects, node*/ 2051) {
 				select1_changes.$$scope = { dirty, ctx };
 			}
 
-			if (!updating_node_1 && dirty & /*node*/ 1) {
-				updating_node_1 = true;
-				select1_changes.node = /*node*/ ctx[0];
-				add_flush_callback(() => updating_node_1 = false);
-			}
-
 			select1.$set(select1_changes);
-			const typedinput_changes = {};
-			if (dirty & /*node*/ 1) typedinput_changes.node = /*node*/ ctx[0];
-			typedinput.$set(typedinput_changes);
+
+			if (/*node*/ ctx[0].action === "start") {
+				if (if_block) {
+					if_block.p(ctx, dirty);
+
+					if (dirty & /*node*/ 1) {
+						transition_in(if_block, 1);
+					}
+				} else {
+					if_block = create_if_block(ctx);
+					if_block.c();
+					transition_in(if_block, 1);
+					if_block.m(if_block_anchor.parentNode, if_block_anchor);
+				}
+			} else if (if_block) {
+				group_outros();
+
+				transition_out(if_block, 1, 1, () => {
+					if_block = null;
+				});
+
+				check_outros();
+			}
 		},
 		i(local) {
 			if (current) return;
@@ -4703,7 +4734,7 @@ function create_fragment(ctx) {
 			transition_in(input1.$$.fragment, local);
 			transition_in(select0.$$.fragment, local);
 			transition_in(select1.$$.fragment, local);
-			transition_in(typedinput.$$.fragment, local);
+			transition_in(if_block);
 			current = true;
 		},
 		o(local) {
@@ -4711,7 +4742,7 @@ function create_fragment(ctx) {
 			transition_out(input1.$$.fragment, local);
 			transition_out(select0.$$.fragment, local);
 			transition_out(select1.$$.fragment, local);
-			transition_out(typedinput.$$.fragment, local);
+			transition_out(if_block);
 			current = false;
 		},
 		d(detaching) {
@@ -4723,7 +4754,8 @@ function create_fragment(ctx) {
 			if (detaching) detach(t2);
 			destroy_component(select1, detaching);
 			if (detaching) detach(t3);
-			destroy_component(typedinput, detaching);
+			if (if_block) if_block.d(detaching);
+			if (detaching) detach(if_block_anchor);
 		}
 	};
 }
@@ -4824,29 +4856,13 @@ function instance($$self, $$props, $$invalidate) {
 		}
 	];
 
-	function select0_node_binding(value) {
-		node = value;
-		$$invalidate(0, node);
-	}
-
-	function select1_node_binding(value) {
-		node = value;
-		$$invalidate(0, node);
-	}
+	const change_handler = e => $$invalidate(0, node.action = e.detail.value, node);
 
 	$$self.$$set = $$props => {
 		if ("node" in $$props) $$invalidate(0, node = $$props.node);
 	};
 
-	return [
-		node,
-		projects,
-		buttonIcon,
-		reloadProjects,
-		portTypes,
-		select0_node_binding,
-		select1_node_binding
-	];
+	return [node, projects, buttonIcon, reloadProjects, portTypes, change_handler];
 }
 
 class Shuttle_control extends SvelteComponent {

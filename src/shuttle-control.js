@@ -64,9 +64,10 @@ module.exports = function (RED) {
         fs.symlinkSync(linkTo, linkFrom)
       }
       // Run node
+      // TODO determine parameters from msg (if set to dynamic in node properties)
       return fork(
         nodeRedRuntime,
-        ['-u', instanceDir, node.project],
+        ['-u', instanceDir, '-p', node.runtime.port, node.project],
         {
           silent: true
         }

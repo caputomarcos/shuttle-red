@@ -7,6 +7,11 @@ module.exports = function (RED) {
         node.name = config.name
         node.version = config.nodeRedVersion
         node.settings = config.settings
+        if (config.portType === 'dynamic') {
+            node.port = 0
+        } else {
+            node.port = config.port
+        }
     }
 
     RED.nodes.registerType('shuttle-runtime', ShuttleRuntimeNode)

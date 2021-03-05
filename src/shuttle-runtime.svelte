@@ -8,8 +8,10 @@
 		defaults: {
 			name: { value: "", label: "Runtime ID" },
 			nodeRedVersion: { value: "latest", label: "Node-RED version" },
+			port: { value: "", label: "Port" },
+			portType: { value: "dynamic" },
             // TODO
-            settings: { value: "", label: "Settings file" }
+			settings: { value: "", label: "Settings file" }
 		},
 		inputs: 0,
 		outputs: 0,
@@ -37,7 +39,7 @@
 </script>
 <script>
 	export let node
-	import { Select, Input } from 'svelte-integration-red/components'
+	import { Select, Input, TypedInput } from 'svelte-integration-red/components'
     
     // The auth token is needed to access to the HTTP API
     const authTokens = RED.settings.get("auth-tokens")
@@ -77,6 +79,15 @@
         readNrInfo()
     }
     $: nodeRedVersionOnly = node.nodeRedVersion ? node.nodeRedVersion.substring(node.nodeRedVersion.indexOf(':') + 1) : ''
+
+	const portTypes = [
+		"num",
+		{
+			value: "dynamic",
+			label: "dynamic",
+			hasValue: false
+		}
+	]
 </script>
 <Input {node} prop="name" />
 <Select bind:node prop="nodeRedVersion" button="{buttonIcon}" on:click={reloadVersions}>
@@ -90,3 +101,4 @@
 	    <option selected={node.nodeRedVersion === 'version:' + version} value="{'version:' + version}">{version}</option>
     {/each}
 </Select>
+<TypedInput {node} prop="port" typeProp="portType" types={portTypes} />

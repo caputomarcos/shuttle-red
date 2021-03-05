@@ -23,6 +23,11 @@ module.exports = function (RED) {
     }
     const shuttles = this.context().flow.get('shuttles')
 
+    node.getRunningShuttles = () => Object.keys(shuttles)
+    node.sendTo = (shuttleId, msg) => {
+      shuttles[shuttleId]?.send(msg)
+    }
+
     const nodeRedVersion = node.runtime.version.substring(node.runtime.version.indexOf(':') + 1)
     const versionIsTag = node.runtime.version.startsWith('tag:')
 

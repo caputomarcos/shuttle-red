@@ -25,7 +25,7 @@ module.exports = function (RED) {
 
     const listener = []
 
-    // If shuttles are already running, we need to activate the listeners
+    // If shuttles are already running, we need to reattach the listeners
     if (Object.keys(shuttles).length > 0) {
       Object.keys(shuttles).forEach((shuttleId) => {
         shuttles[shuttleId].on('message', (message) => {

@@ -126,24 +126,24 @@ module.exports = function (RED) {
 
     node.on('input', function (msg, send, done) {
       // TODO: The ID might be determined dynamically
-      const shuttleId = node.name
+      const shuttle_id = node.name
 
       switch (node.action) {
         case 'start': {
-          start(shuttleId, msg, send).then((shuttleProcess) => {
+          start(shuttle_id, msg, send).then((shuttleProcess) => {
             if (!shuttleProcess) {
-              msg.payload = false
+              msg.payload = { shuttle_id, started: false }
               send(msg)
               done()
             } else {
-              shuttles[shuttleId] = shuttleProcess
-              msg.payload = shuttleProcess.connected
+              shuttles[shuttle_id] = shuttleProcess
+              msg.payload = { shuttle_id, started: shuttleProcess.connected }
               send(msg)
               done()
             }
           }).catch((error) => {
             node.warn(error)
-            msg.payload = false
+            msg.payload = { shuttle_id, started: false }
             send(msg)
             done()
           })
@@ -153,42 +153,42 @@ module.exports = function (RED) {
           function handleStart (shuttleId, msg, send, done) {
             start(shuttleId, msg).then((shuttleProcess) => {
               if (!shuttleProcess) {
-                msg.payload = false
+                msg.payload = { shuttle_id, started: false }
                 send(msg)
                 done()
               } else {
                 shuttles[shuttleId] = shuttleProcess
-                msg.payload = shuttleProcess.connected
+                msg.payload = { shuttle_id, started: shuttleProcess.connected }
                 send(msg)
                 done()
               }
             })
           }
-          stop(shuttleId, msg).then(() => {
+          stop(shuttle_id, msg).then(() => {
             // Instance could be stopped
-            handleStart(shuttleId, msg, send, done)
+            handleStart(shuttle_id, msg, send, done)
           }, () => {
             // Instance could not be stopped
-            node.warn('Warning: Could not stop shuttle. Instance "' + shuttleId + '" was not running.')
-            handleStart(shuttleId, msg, send, done)
+            node.warn('Warning: Could not stop shuttle. Instance "' + shuttle_id + '" was not running.')
+            handleStart(shuttle_id, msg, send, done)
           }).catch((error) => {
             node.error(error)
-            msg.payload = false
+            msg.payload = { shuttle_id, started: false }
             send(msg)
             done()
           })
           break
         }
         case 'stop': {
-          stop(shuttleId, msg).then((terminated) => {
+          stop(shuttle_id, msg).then((terminated) => {
             if (terminated) {
-              delete shuttles[shuttleId]
+              delete shuttles[shuttle_id]
             }
-            msg.payload = terminated
+            msg.payload = { shuttle_id, stopped: terminated }
             send(msg)
             done()
           }).catch((error) => {
-            msg.payload = false
+            msg.payload = { shuttle_id, stopped: false }
             send(msg)
             done()
           })

@@ -9,7 +9,7 @@ module.exports = function (RED) {
         if (receiver === '__PARENT__') {
           node.receivers.push((msg) => {
             if (process.send) {
-              process.send(msg)
+              process.send(msg.payload)
             }
           })
         } else {
@@ -19,14 +19,14 @@ module.exports = function (RED) {
             node.receivers.push((msg) => {
               const remoteIDs = controlNode.getRunningShuttles()
               if (remoteIDs.indexOf(filter) >= 0) {
-                controlNode.sendTo(filter, msg)
+                controlNode.sendTo(filter, msg.payload)
               }
             })
           } else {
             node.receivers.push((msg) => {
               const remoteIDs = controlNode.getRunningShuttles()
               remoteIDs.forEach((shuttleId) => {
-                controlNode.sendTo(shuttleId, msg)
+                controlNode.sendTo(shuttleId, msg.payload)
               })
             })
           }

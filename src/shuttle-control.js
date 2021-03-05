@@ -27,6 +27,10 @@ module.exports = function (RED) {
     node.sendTo = (shuttleId, msg) => {
       shuttles[shuttleId]?.send(msg)
     }
+    node.messageListener = []
+    node.onMessage = (callback) => {
+      node.messageListener.push(callback)
+    }
 
     const nodeRedVersion = node.runtime.version.substring(node.runtime.version.indexOf(':') + 1)
     const versionIsTag = node.runtime.version.startsWith('tag:')
@@ -118,6 +122,12 @@ module.exports = function (RED) {
       })
       shuttleProcess.on('error', (error) => {
         console.error(error)
+      })
+      // Route message
+      shuttleProcess.on('message', (message) => {
+        node.messageListener.forEach((receive) => {
+          receive(message, shuttleId)
+        })
       })
       return shuttleProcess
     }

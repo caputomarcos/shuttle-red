@@ -188,6 +188,7 @@ module.exports = function (RED) {
             send(msg)
             done()
           }).catch((error) => {
+            node.error(error)
             msg.payload = { shuttle_id, stopped: false }
             send(msg)
             done()

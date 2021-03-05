@@ -12,6 +12,11 @@ module.exports = function (RED) {
     node.action = config.action
     node.runtime = RED.nodes.getNode(config.runtime)
     node.project = config.project
+    if (config.portType === 'dynamic') {
+        node.port = 0
+    } else {
+        node.port = config.port
+    }
 
     if (!this.context().flow.get('shuttles')) {
       this.context().flow.set('shuttles', {})
@@ -48,9 +53,7 @@ module.exports = function (RED) {
      * 4. Create symbolic link inside the projects directory linking to the project that should be started
      * 5. Run node ./node-red/<version or tag>/node_modules/node-red/red.js -u ./runtime/<id>/ <project name> using child_process.fork()
      */
-    async function start (msg, send) {
-      // TODO: The ID might be determined dynamically
-      const shuttleId = node.name
+    async function start (shuttleId, _msg) {
       if (shuttles.hasOwnProperty(shuttleId)) {
         throw new Error('Could not start shuttle: An instance with the ID "' + shuttleId + '" is already running.')
       }
@@ -95,50 +98,98 @@ module.exports = function (RED) {
       }
       // Run node
       // TODO determine parameters from msg (if set to dynamic in node properties)
-      return fork(
+      const shuttleProcess = fork(
         nodeRedRuntime,
-        ['-u', instanceDir, '-p', node.runtime.port, node.project],
+        ['-u', instanceDir, '-p', node.port, node.project],
         {
           silent: true
         }
       )
+      shuttleProcess.stdout?.on('data', (data) => {
+        console.log('[Shuttle ' + shuttleId + ']', data.toString())
+      })
+      shuttleProcess.stderr?.on('data', (data) => {
+        console.error('[Shuttle ' + shuttleId + ']', data.toString())
+      })
+      shuttleProcess.on('error', (error) => {
+        console.error(error)
+      })
+      return shuttleProcess
     }
 
-    async function stop (msg, send){
-      // TODO
+    async function stop (shuttleId, _msg) {
+      if (!shuttles.hasOwnProperty(shuttleId)) {
+        throw new Error('Could not stop shuttle. No instance with the id "' + shuttleId + '" is running.')
+      }
+      return shuttles[shuttleId]?.kill()
     }
 
     node.on('input', function (msg, send, done) {
-      switch(node.action) {
+      // TODO: The ID might be determined dynamically
+      const shuttleId = node.name
+
+      switch (node.action) {
         case 'start': {
-          start(msg, send).then((shuttleProcess) => {
-            shuttleProcess.stdout?.on('data', (data) => {
-              console.log('[Shuttle ' + node.name + ']', data.toString())
-            })
-            shuttleProcess.stderr?.on('data', (data) => {
-              console.error('[Shuttle ' + node.name + ']', data.toString())
-            })
-            shuttleProcess.on('error', (error) => {
-              console.error(error)
-            })
-            // TODO: The id might be dynamic
-            shuttles[node.name] = shuttleProcess
-            done()
+          start(shuttleId, msg, send).then((shuttleProcess) => {
+            if (!shuttleProcess) {
+              msg.payload = false
+              send(msg)
+              done()
+            } else {
+              shuttles[shuttleId] = shuttleProcess
+              msg.payload = shuttleProcess.connected
+              send(msg)
+              done()
+            }
           }).catch((error) => {
-            node.error(error)
+            node.warn(error)
+            msg.payload = false
+            send(msg)
+            done()
           })
           break
         }
         case 'restart': {
-          stop(msg, send).then(() => {
-            runStart(msg, send)
-          }).then(() => {
+          function handleStart (shuttleId, msg, send, done) {
+            start(shuttleId, msg).then((shuttleProcess) => {
+              if (!shuttleProcess) {
+                msg.payload = false
+                send(msg)
+                done()
+              } else {
+                shuttles[shuttleId] = shuttleProcess
+                msg.payload = shuttleProcess.connected
+                send(msg)
+                done()
+              }
+            })
+          }
+          stop(shuttleId, msg).then(() => {
+            // Instance could be stopped
+            handleStart(shuttleId, msg, send, done)
+          }, () => {
+            // Instance could not be stopped
+            node.warn('Warning: Could not stop shuttle. Instance "' + shuttleId + '" was not running.')
+            handleStart(shuttleId, msg, send, done)
+          }).catch((error) => {
+            node.error(error)
+            msg.payload = false
+            send(msg)
             done()
           })
           break
         }
         case 'stop': {
-          stop(msg, send).then(() => {
+          stop(shuttleId, msg).then((terminated) => {
+            if (terminated) {
+              delete shuttles[shuttleId]
+            }
+            msg.payload = terminated
+            send(msg)
+            done()
+          }).catch((error) => {
+            msg.payload = false
+            send(msg)
             done()
           })
           break

@@ -10,7 +10,9 @@
 			name: { value: "", label: "Shuttle ID" },
 			action: { value: "start", label: "Action" },
             runtime: { value: "", type:"shuttle-runtime", label: "Runtime" },
-            project: { value: "", label: "Project" }
+            project: { value: "", label: "Project" },
+			port: { value: "", label: "Port" },
+			portType: { value: "dynamic" }
 		},
 		inputs: 1,
 		outputs: 1,
@@ -35,7 +37,7 @@
 </script>
 <script>
 	export let node
-	import { Select, Input } from 'svelte-integration-red/components'
+	import { Select, Input, TypedInput } from 'svelte-integration-red/components'
     
     // The auth token is needed to access to the HTTP API
     const authTokens = RED.settings.get("auth-tokens")
@@ -74,6 +76,15 @@
     if (projects.length === 0) {
         readProjects()
     }
+
+	const portTypes = [
+		"num",
+		{
+			value: "dynamic",
+			label: "dynamic",
+			hasValue: false
+		}
+	]
 </script>
 <Input {node} prop="name" placeholder='project name if not defined' />
 <Input {node} type="config" prop="runtime" />
@@ -90,3 +101,4 @@
 	    <option selected={node.project === project} value="{project}">{project}</option>
     {/each}
 </Select>
+<TypedInput {node} prop="port" typeProp="portType" types={portTypes} />

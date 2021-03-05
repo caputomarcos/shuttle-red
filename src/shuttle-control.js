@@ -13,6 +13,11 @@ module.exports = function (RED) {
     node.runtime = RED.nodes.getNode(config.runtime)
     node.project = config.project
 
+    if (!this.context().flow.get('shuttles')) {
+      this.context().flow.set('shuttles', {})
+    }
+    const shuttles = this.context().flow.get('shuttles')
+
     const nodeRedVersion = node.runtime.version.substring(node.runtime.version.indexOf(':') + 1)
     const versionIsTag = node.runtime.version.startsWith('tag:')
 
@@ -40,6 +45,10 @@ module.exports = function (RED) {
      * 5. Run node ./node-red/<version or tag>/node_modules/node-red/red.js -u ./runtime/<id>/ <project name> using child_process.fork()
      */
     async function start (msg, send) {
+      // TODO: The ID might be determined dynamically
+      if (shuttles.hasOwnProperty(node.name)) {
+        throw new Error('Could not start shuttle: An instance with the ID "' + node.name + '" is already running.')
+      }
       // Check if directory structure has been initialized
       const shuttleDirExists = fs.existsSync(shuttleDir) && fs.existsSync(nodeRedDir)  && fs.existsSync(runtimeDir)
       if (!shuttleDirExists) {
@@ -91,11 +100,11 @@ module.exports = function (RED) {
             shuttleProcess.on('error', (error) => {
               console.error(error)
             })
-            // TODO: Save shuttle info for later reference
+            // TODO: The id might be dynamic
+            shuttles[node.name] = shuttleProcess
             done()
           }).catch((error) => {
-            // TODO: Implement proper error handling
-            console.log(error)
+            node.error(error)
           })
           break
         }

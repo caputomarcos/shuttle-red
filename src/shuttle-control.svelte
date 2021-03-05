@@ -36,6 +36,44 @@
 <script>
 	export let node
 	import { Select, Input } from 'svelte-integration-red/components'
+    
+    // The auth token is needed to access to the HTTP API
+    const authTokens = RED.settings.get("auth-tokens")
+
+    let projects = []
+    let buttonIcon = "clock-o"
+    function reloadProjects () {
+        buttonIcon = "clock-o"
+        window.$.getJSON({
+			url: "/shuttle-red/reloadProjects",
+			success: (projectsFromServer) => {
+                buttonIcon = "cloud-download"
+                projects = projectsFromServer
+			},
+			headers: authTokens
+				? {
+						Authorization: "Bearer " + authTokens.access_token
+					}
+                : {}
+		})
+    }
+    function readProjects () {
+		window.$.getJSON({
+			url: "/shuttle-red/getProjects",
+			success: (projectsFromServer) => {
+                buttonIcon = "cloud-download"
+                projects = projectsFromServer
+			},
+			headers: authTokens
+				? {
+						Authorization: "Bearer " + authTokens.access_token
+					}
+                : {}
+		})
+	}
+    if (projects.length === 0) {
+        readProjects()
+    }
 </script>
 <Input {node} prop="name" placeholder='project name if not defined' />
 <Input {node} type="config" prop="runtime" />
@@ -44,8 +82,11 @@
 	<option value="stop">Stop runtime</option>
 	<option value="restart">Restart runtime</option>
 </Select>
-<Select bind:node prop="project">
-	<option value="__MSG.PAYLOAD__">Determine from msg.payload</option>
-	<option value="__MSG.PROJECT__">Determine from msg.project</option>
-	<option value="__EMPTY__">Empty project</option>
+<Select bind:node prop="project" button="{buttonIcon}" on:click={reloadProjects}>
+	<option selected={node.project === "__MSG.PAYLOAD__"} value="__MSG.PAYLOAD__">Determine from msg.payload</option>
+	<option selected={node.project === "__MSG.PROJECT__"} value="__MSG.PROJECT__">Determine from msg.project</option>
+	<option selected={node.project === "__EMPTY__"} value="__EMPTY__">Empty project</option>
+	{#each projects as project}
+	    <option selected={node.project === project} value="{project}">{project}</option>
+    {/each}
 </Select>

@@ -29,8 +29,12 @@ module.exports = function (RED) {
     const nodeRedRuntime = path.join(nodeRedVersionDir, 'node_modules', 'node-red', 'red.js')
     const runtimeDir = path.join(shuttleDir, 'runtime')
     const instanceDir = path.join(runtimeDir, node.name)
+    const instanceProjectFile = path.join(instanceDir, 'package.json')
     const projectsDir = path.join(userDir, 'projects')
     const instanceProjectsDir = path.join(instanceDir, 'projects')
+    const instanceModulesDir = path.join(instanceDir, 'node_modules')
+    const instanceShuttleRedDir = path.join(instanceModulesDir, 'shuttle-red')
+    const modulesShuttleRedDir = path.join(__dirname, '..')
     const linkTo = path.join(projectsDir, node.project)
     const linkFrom = path.join(instanceProjectsDir, node.project)
 
@@ -63,12 +67,29 @@ module.exports = function (RED) {
         // Check if the node-red version can be updated (is it a tag?)
         await npm.update(nodeRedVersion, nodeRedDir)
       }
-      // Create symbolic link
-      if (!fs.existsSync(linkTo)) {
-        node.error('Could not start runtime: Project "' + node.project + '" does not exist.')
-        return
-      }
-      if (!fs.existsSync(linkFrom)) {
+      // Check if instance folder has been initialized
+      if (!fs.existsSync(instanceDir)) {
+        fs.mkdirSync(instanceModulesDir, { recursive: true })
+        // Create symbolic link to shuttle-RED module
+        fs.symlinkSync(modulesShuttleRedDir, instanceShuttleRedDir)
+        // Create projects file
+        // TODO: The ID might be determined dynamically
+        fs.writeFileSync(instanceProjectFile, `
+          {
+            "name": "shuttle ${node.name}",
+            "description": "A Node-RED instance started from within Node-RED. We call it a shuttle.",
+            "author": "The shuttle-RED commander :o)",
+            "version": "1.0.0",
+            "dependencies": {
+              "shuttle-red": "*"
+            }
+          }
+        `)
+        // Create symbolic link to project
+        if (!fs.existsSync(linkTo)) {
+          node.error('Could not start runtime: Project "' + node.project + '" does not exist.')
+          return
+        }
         fs.mkdirSync(instanceProjectsDir, { recursive: true })
         fs.symlinkSync(linkTo, linkFrom)
       }

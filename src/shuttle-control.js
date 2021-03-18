@@ -103,7 +103,7 @@ module.exports = function (RED) {
           {
             "name": "shuttle ${shuttleId}",
             "description": "A Node-RED instance started from within Node-RED. We call it a shuttle.",
-            "author": "The shuttle-RED commander :o)",
+            "author": "The shuttle commander :o)",
             "version": "1.0.0",
             "dependencies": {
               "shuttle-red": "*"

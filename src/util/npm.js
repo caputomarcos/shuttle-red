@@ -64,11 +64,21 @@ async function versions () {
 }
 
 async function install (versionOrTag, directory='./node-red/') {
-  await exec(npmCmd, ['install', '--prefix', path.join(directory, versionOrTag), 'node-red@' + versionOrTag])
+  console.log(`Installing "${versionOrTag}" to "${directory}"...`)
+  const status = await exec(npmCmd, ['install', '--prefix', path.join(directory, versionOrTag), 'node-red@' + versionOrTag])
+  if (status.stderr) {
+    console.error(status.stderr)
+  }
+  console.log(`Finished installation of "${versionOrTag}" with status code ${status.code}.`)
 }
 
 async function update (tag, directory='./node-red/') {
+  console.log(`Updating "${versionOrTag}" in "${directory}"...`)
   await exec(npmCmd, ['update', '--prefix', path.join(directory, tag), 'node-red@' + tag])
+  if (status.stderr) {
+    console.error(status.stderr)
+  }
+  console.log(`Finished update of "${versionOrTag}" with status code ${status.code}.`)
 }
 
 module.exports = {

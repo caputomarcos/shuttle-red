@@ -10,7 +10,6 @@ module.exports = function (RED) {
     const node = this
     node.name = config.name
     node.action = config.action
-    node.dynamic = config.dynamic
     node.runtime = RED.nodes.getNode(config.runtime)
     node.project = config.project
     if (config.portType === 'dynamic') {
@@ -63,8 +62,6 @@ module.exports = function (RED) {
     const instanceModulesDir = path.join(instanceDir, 'node_modules')
     const instanceShuttleRedDir = path.join(instanceModulesDir, 'shuttle-red')
     const modulesShuttleRedDir = path.join(__dirname, '..')
-    const linkTo = path.join(projectsDir, node.project)
-    const linkFrom = path.join(instanceProjectsDir, node.project)
 
     /*
      * Starting a new runtime:
@@ -76,7 +73,12 @@ module.exports = function (RED) {
      * 4. Create symbolic link inside the projects directory linking to the project that should be started
      * 5. Run node ./node-red/<version or tag>/node_modules/node-red/red.js -u ./runtime/<id>/ <project name> using child_process.fork()
      */
-    async function start (shuttleId, port, msg) {
+    async function start (shuttleId, options) {
+      if (projectName === '__NEW__') {
+        // TODO Create project
+      }
+      const linkTo = path.join(projectsDir, options.projectName)
+      const linkFrom = path.join(instanceProjectsDir, options.projectName)
       if (shuttles.hasOwnProperty(shuttleId)) {
         throw new Error('Could not start shuttle: An instance with the ID "' + shuttleId + '" is already running.')
       }
@@ -113,7 +115,7 @@ module.exports = function (RED) {
         `)
         // Create symbolic link to project
         if (!fs.existsSync(linkTo)) {
-          node.error('Could not start runtime: Project "' + node.project + '" does not exist.')
+          node.error('Could not start runtime: Project "' + options.projectName + '" does not exist.')
           return
         }
         fs.mkdirSync(instanceProjectsDir, { recursive: true })
@@ -122,7 +124,7 @@ module.exports = function (RED) {
       // Run node
       const shuttleProcess = fork(
         nodeRedRuntime,
-        ['-u', instanceDir, '-p', port, node.project],
+        ['-u', instanceDir, '-p', options.port, options.projectName],
         {
           silent: true
         }
@@ -153,12 +155,37 @@ module.exports = function (RED) {
     }
 
     node.on('input', function (msg, send, done) {
-      // TODO: The ID might be determined dynamically
-      const shuttle_id = node.name
+      let projectName
+      if (node.project.startsWith('__MSG')) {
+        if (node.project === '__MSG.PAYLOAD__' && typeof msg.payload?.project === 'string') {
+          projectName = msg.payload.project
+        } else if (node.project === '__MSG__' && typeof msg.project === 'string') {
+          projectName = msg.project
+        } else {
+          throw new Error("Could not determine project.")
+        }
+      } else {
+        projectName = node.project
+      }
+      
+      const shuttle_id = node.name || msg.payload?.shuttle_id || msg.shuttle_id || projectName
 
-      switch (node.action) {
+      let action
+      if (node.action.startsWith('__MSG')) {
+        if (node.action === '__MSG.PAYLOAD__' && typeof msg.payload?.action === 'string') {
+          action = msg.payload.action
+        } else if (node.project === '__MSG__' && typeof msg.action === 'string') {
+          action = msg.action
+        } else {
+          throw new Error("Could not determine project.")
+        }
+      } else {
+        action = node.action
+      }
+      switch (action) {
         case 'start': {
-          start(shuttle_id, node.port, msg).then((shuttleProcess) => {
+          const port = node.port === 'msg' ? msg.port : node.port === 'msg.payload' ? msg.payload.port : node.port
+          start(shuttle_id, { projectName, port, msg }).then((shuttleProcess) => {
             if (!shuttleProcess) {
               msg.payload = { shuttle_id, started: false }
               send(msg)
@@ -185,10 +212,11 @@ module.exports = function (RED) {
             done()
           } else {
             const port = shuttles[shuttle_id].spawnargs[5]
+            const projectName = shuttles[shuttle_id].spawnargs[6]
             stop(shuttle_id, msg).then(() => {
               // Instance could be stopped
               delete shuttles[shuttle_id]
-              start(shuttle_id, port, msg).then((shuttleProcess) => {
+              start(shuttle_id, { projectName, port, msg }).then((shuttleProcess) => {
                 if (!shuttleProcess) {
                   msg.payload = { shuttle_id, started: false }
                   send(msg)

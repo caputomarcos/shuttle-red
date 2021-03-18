@@ -2,7 +2,7 @@
     RED.nodes.registerType("shuttle-receive", {
 		name: { value: "shuttle-receive" },
 		category: "Runtime",
-		color: "#D9A6AB",
+		color: "#90CAFF",
 		defaults: {
 			name: { value: "", label: "Name" },
 			listenTo: { value: { __PARENT__: true } }

@@ -2,7 +2,7 @@
     RED.nodes.registerType("shuttle-send", {
 		name: { value: "shuttle-send" },
 		category: "Runtime",
-		color: "#D9A6AB",
+		color: "#90CAFF",
 		defaults: {
 			name: { value: "", label: "Name" },
 			sendTo: { value: { __PARENT__: true } },

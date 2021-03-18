@@ -8,6 +8,7 @@
 		color: "#D9A6AB",
 		defaults: {
 			name: { value: "", label: "Shuttle ID" },
+			dynamic: { value: false },
 			action: { value: "start", label: "Action" },
             runtime: { value: "", type:"shuttle-runtime", label: "Runtime" },
             project: { value: "", label: "Project" },
@@ -93,14 +94,20 @@
 	<option value="stop">Stop runtime</option>
 	<option value="restart">Restart runtime</option>
 </Select>
-<Select {node} prop="project" button="{buttonIcon}" on:click={reloadProjects}>
-	<option selected={node.project === "__MSG.PAYLOAD__"} value="__MSG.PAYLOAD__">Determine from msg.payload</option>
-	<option selected={node.project === "__MSG.PROJECT__"} value="__MSG.PROJECT__">Determine from msg.project</option>
-	<option selected={node.project === "__EMPTY__"} value="__EMPTY__">Empty project</option>
-	{#each projects as project}
-	    <option selected={node.project === project} value="{project}">{project}</option>
-    {/each}
-</Select>
+<Input type="checkbox" bind:checked={node.dynamic} label="Determine parameters from msg"/>
+{#if node.dynamic}
+	<Select {node} prop="project">
+		<option selected={node.project === "__MSG.PAYLOAD__"} value="__MSG.PAYLOAD__">Determine from msg.payload</option>
+		<option selected={node.project === "__MSG.PROJECT__"} value="__MSG.PROJECT__">Determine from msg.project</option>
+	</Select>
+{:else}
+	<Select {node} prop="project" button="{buttonIcon}" on:click={reloadProjects}>
+		<option selected={node.project === "__EMPTY__"} value="__EMPTY__">Empty project</option>
+		{#each projects as project}
+			<option selected={node.project === project} value="{project}">{project}</option>
+		{/each}
+	</Select>
+{/if}
 {#if node.action === 'start'}
 	<TypedInput {node} prop="port" typeProp="portType" types={portTypes} />
 {/if}

@@ -10,6 +10,7 @@ module.exports = function (RED) {
     const node = this
     node.name = config.name
     node.action = config.action
+    node.dynamic = config.dynamic
     node.runtime = RED.nodes.getNode(config.runtime)
     node.project = config.project
     if (config.portType === 'dynamic') {
@@ -75,7 +76,7 @@ module.exports = function (RED) {
      * 4. Create symbolic link inside the projects directory linking to the project that should be started
      * 5. Run node ./node-red/<version or tag>/node_modules/node-red/red.js -u ./runtime/<id>/ <project name> using child_process.fork()
      */
-    async function start (shuttleId, port, _msg) {
+    async function start (shuttleId, port, msg) {
       if (shuttles.hasOwnProperty(shuttleId)) {
         throw new Error('Could not start shuttle: An instance with the ID "' + shuttleId + '" is already running.')
       }
@@ -119,7 +120,6 @@ module.exports = function (RED) {
         fs.symlinkSync(linkTo, linkFrom)
       }
       // Run node
-      // TODO determine parameters from msg (if set to dynamic in node properties)
       const shuttleProcess = fork(
         nodeRedRuntime,
         ['-u', instanceDir, '-p', port, node.project],

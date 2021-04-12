@@ -121,7 +121,6 @@
 <Select {node} prop="project" button="{buttonIcon}" on:click={reloadProjects}>
 	<option selected={node.project === "__MSG.PAYLOAD__"} value="__MSG.PAYLOAD__">Determine from msg.payload.project</option>
 	<option selected={node.project === "__MSG__"} value="__MSG__">Determine from msg.project</option>
-	<option selected={node.project === "__NEW__"} value="__NEW__">New project</option>
 	{#each projects as project}
 		<option selected={node.project === project} value="{project}">{project}</option>
 	{/each}

@@ -74,9 +74,6 @@ module.exports = function (RED) {
      * 5. Run node ./node-red/<version or tag>/node_modules/node-red/red.js -u ./runtime/<id>/ <project name> using child_process.fork()
      */
     async function start (shuttleId, options) {
-      if (projectName === '__NEW__') {
-        // TODO Create project
-      }
       const linkTo = path.join(projectsDir, options.projectName)
       const linkFrom = path.join(instanceProjectsDir, options.projectName)
       if (shuttles.hasOwnProperty(shuttleId)) {

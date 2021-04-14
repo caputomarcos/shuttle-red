@@ -8,6 +8,8 @@
     "node-red",
     "nodes",
     "flow",
+    "runtime",
+    "control",
     "multi-tenant",
     "multi-tenancy"
   ],

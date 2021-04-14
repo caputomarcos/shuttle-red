@@ -8,7 +8,8 @@
     "node-red",
     "nodes",
     "flow",
-    "multi-tenant"
+    "multi-tenant",
+    "multi-tenancy"
   ],
   "repository": {
     "type": "git",

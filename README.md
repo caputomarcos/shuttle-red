@@ -10,7 +10,7 @@ No documentation exists at the moment but the nodes editor should be quite self 
 
 ## Usage
 
-Use the control node to start, stop or restart Node-RED instances. You can send messages between the control Node-RED instance and its sub-instances using the message in and out nodes. The runtime determines which Node-RED version should be started. The runtime is downloaded and installed even if it is the same than the one that is currently running. This is due to the fact that Shuttle-RED keeps its own runtimes.
+Use the control node to start, stop or restart Node-RED instances. You can send messages between the control Node-RED instance and its child-instances using the message in and out nodes. The runtime determines which Node-RED version should be started. The runtime is downloaded and installed even if it is the same than the one that is currently running. This is due to the fact that Shuttle-RED keeps its own runtimes.
 
 > Please mind, that you need the projects feature to be turned on and that other projects need to exist in order to be started within a seperate runtime.
 

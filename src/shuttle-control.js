@@ -282,7 +282,7 @@ module.exports = function (RED) {
             fileInfo.isDirectory() ||
               (
                 fileInfo.isSymbolicLink() &&
-                fs.statSync(fs.readlinkSync(fileInfo.name)).isDirectory()
+                fs.statSync(fs.readlinkSync(path.join(projectsDir, fileInfo.name))).isDirectory()
               )
             ) {
             projects.push(fileInfo.name)

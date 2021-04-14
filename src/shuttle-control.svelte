@@ -12,7 +12,8 @@
             runtime: { value: "", type:"shuttle-runtime", label: "Runtime" },
             project: { value: "", label: "Project" },
 			port: { value: "", label: "Port" },
-			portType: { value: "dynamic" }
+			portType: { value: "dynamic" },
+			environment: { value: [] }
 		},
 		inputs: 1,
 		outputs: 1,
@@ -50,7 +51,7 @@
 </script>
 <script>
 	export let node
-	import { Select, Input, TypedInput } from 'svelte-integration-red/components'
+	import { Select, Input, TypedInput, EditableList, Row } from 'svelte-integration-red/components'
     
     // The auth token is needed to access to the HTTP API
     const authTokens = RED.settings.get("auth-tokens")
@@ -108,6 +109,10 @@
 			hasValue: false
 		}
 	]
+
+	function addEnvironmentVariable() {
+		node.environment = [...node.environment, { key: '', value: '', type: 'str' }]
+	}
 </script>
 <Input {node} prop="name" placeholder='msg.payload.shuttle_id || msg.shuttle_id || project name' />
 <Input {node} type="config" prop="runtime" />
@@ -127,4 +132,20 @@
 </Select>
 {#if node.action === 'start'}
 	<TypedInput {node} prop="port" typeProp="portType" types={portTypes} />
+	<EditableList sortable removable label="Environment Variables" icon="list" bind:elements={node.environment} let:element={environmentVariable} let:index addButton style="height: 200px;"
+			on:add={addEnvironmentVariable}>
+		<Row style="margin-bottom: 0px; width: 70%;">
+			<Input inline value={environmentVariable.key} on:change={(e) => node.environment[index].key = e.detail.value} placeholder="Key"></Input>
+			<TypedInput inline label=''
+			value={environmentVariable.value}
+			type={environmentVariable.type}
+			types={['msg', 'flow', 'global', 'str', 'num', 'bool', 'json', 'jsonata', 'date', 'env']}
+			on:change={(e) => {
+				node.environment[index].value = e.detail.value
+				node.environment[index].type = e.detail.type
+			}}
+			placeholder="Value">
+		</TypedInput>
+		</Row>
+	</EditableList>
 {/if}

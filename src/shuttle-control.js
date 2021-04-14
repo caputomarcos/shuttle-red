@@ -118,12 +118,24 @@ module.exports = function (RED) {
         fs.mkdirSync(instanceProjectsDir, { recursive: true })
         fs.symlinkSync(linkTo, linkFrom)
       }
+      // Determine environment variables
+      let env = {}
+      Object.assign(env, process.env)
+      Object.assign(env, node.runtime.environment)
+      Object.assign(env, node.environment)
+      Object.keys(env).map((key) => {
+        const envValue = env[key]
+        if (envValue.hasOwnProperty('type')) {
+          env[key] = RED.util.evaluateNodeProperty(envValue.value, envValue.type, node, options.msg)
+        }
+      })
       // Run node
       const shuttleProcess = fork(
         nodeRedRuntime,
         ['-u', instanceDir, '-p', options.port, options.projectName],
         {
-          silent: true
+          silent: true,
+          env
         }
       )
       shuttleProcess.stdout?.on('data', (data) => {

@@ -8,6 +8,7 @@
 		defaults: {
 			name: { value: "", label: "Runtime ID" },
 			nodeRedVersion: { value: "latest", label: "Node-RED version" },
+			environment: { value: [] },
             // TODO
 			settings: { value: "", label: "Settings file" }
 		},
@@ -37,7 +38,7 @@
 </script>
 <script>
 	export let node
-	import { Select, Input } from 'svelte-integration-red/components'
+	import { Select, Input, TypedInput, EditableList, Row } from 'svelte-integration-red/components'
     
     // The auth token is needed to access to the HTTP API
     const authTokens = RED.settings.get("auth-tokens")
@@ -77,6 +78,10 @@
         readNrInfo()
     }
     $: nodeRedVersionOnly = node.nodeRedVersion ? node.nodeRedVersion.substring(node.nodeRedVersion.indexOf(':') + 1) : ''
+
+	function addEnvironmentVariable() {
+		node.environment = [...node.environment, { key: '', value: '', type: 'str' }]
+	}
 </script>
 <Input {node} prop="name" />
 <Select bind:node prop="nodeRedVersion" button="{buttonIcon}" on:click={reloadVersions}>
@@ -90,3 +95,19 @@
 	    <option selected={node.nodeRedVersion === 'version:' + version} value="{'version:' + version}">{version}</option>
     {/each}
 </Select>
+<EditableList sortable removable label="Environment Variables" icon="list" bind:elements={node.environment} let:element={environmentVariable} let:index addButton style="height: 200px;"
+		on:add={addEnvironmentVariable}>
+	<Row style="margin-bottom: 0px; width: 70%;">
+		<Input inline value={environmentVariable.key} on:change={(e) => node.environment[index].key = e.detail.value} placeholder="Key"></Input>
+		<TypedInput inline label=''
+			value={environmentVariable.value}
+			type={environmentVariable.type}
+			types={['msg', 'flow', 'global', 'str', 'num', 'bool', 'json', 'jsonata', 'date', 'env']}
+			on:change={(e) => {
+				node.environment[index].value = e.detail.value
+				node.environment[index].type = e.detail.type
+			}}
+			placeholder="Value">
+		</TypedInput>
+	</Row>
+</EditableList>

@@ -7,7 +7,6 @@ module.exports = function (RED) {
         node.name = config.name
         node.version = config.nodeRedVersion
         node.environment = config.environment
-        node.settings = config.settings
     }
 
     RED.nodes.registerType('shuttle-runtime', ShuttleRuntimeNode)

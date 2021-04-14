@@ -8,9 +8,7 @@
 		defaults: {
 			name: { value: "", label: "Runtime ID" },
 			nodeRedVersion: { value: "latest", label: "Node-RED version" },
-			environment: { value: [] },
-            // TODO
-			settings: { value: "", label: "Settings file" }
+			environment: { value: [] }
 		},
 		inputs: 0,
 		outputs: 0,

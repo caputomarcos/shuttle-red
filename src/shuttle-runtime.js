@@ -6,6 +6,7 @@ module.exports = function (RED) {
         const node = this
         node.name = config.name
         node.version = config.nodeRedVersion
+        node.environment = config.environment
         node.settings = config.settings
     }
 

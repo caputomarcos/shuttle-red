@@ -17,6 +17,7 @@ module.exports = function (RED) {
     } else {
         node.port = config.port
     }
+    node.environment = config.environment
 
     if (!this.context().flow.get('shuttles')) {
       this.context().flow.set('shuttles', {})
@@ -120,13 +121,10 @@ module.exports = function (RED) {
       }
       // Determine environment variables
       let env = {}
-      Object.assign(env, process.env)
-      Object.assign(env, node.runtime.environment)
-      Object.assign(env, node.environment)
-      Object.keys(env).map((key) => {
-        const envValue = env[key]
-        if (envValue.hasOwnProperty('type')) {
-          env[key] = RED.util.evaluateNodeProperty(envValue.value, envValue.type, node, options.msg)
+      Object.assign(env, process.env);
+      [ ...node.runtime.environment, ...node.environment ].forEach((envVariable) => {
+        if (envVariable.hasOwnProperty('type')) {
+          env[envVariable.key] = RED.util.evaluateNodeProperty(envVariable.value, envVariable.type, node, options.msg)
         }
       })
       // Run node
@@ -280,7 +278,13 @@ module.exports = function (RED) {
       fs.mkdirSync(projectsDir, { recursive: true })
     }
     fs.readdirSync(projectsDir, { withFileTypes: true }).forEach((fileInfo) => {
-        if (fileInfo.isDirectory()) {
+        if (
+            fileInfo.isDirectory() ||
+              (
+                fileInfo.isSymbolicLink() &&
+                fs.statSync(fs.readlinkSync(fileInfo.name)).isDirectory()
+              )
+            ) {
             projects.push(fileInfo.name)
         }
     })

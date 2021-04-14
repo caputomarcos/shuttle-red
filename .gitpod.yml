@@ -1,4 +1,4 @@
 tasks:
-  - before: cd /home/gitpod/.nvm/versions/node/*/lib/node_modules/node-red/ && npm link /workspace/shuttle-red/ && cd /workspace/shuttle-red/ && npm link && npm update -g svelte-integration-red
+  - before: cd /home/gitpod/.nvm/versions/node/*/lib/node_modules/node-red/ && npm link /workspace/shuttle-red/ && cd /workspace/shuttle-red/ && npm link && npm update -g svelte-integration-red && ln -s /workspace/shuttle-red/test_project ~/.node-red/projects/test_project
 image:
   file: .gitpod.Dockerfile

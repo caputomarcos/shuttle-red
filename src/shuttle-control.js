@@ -132,7 +132,7 @@ module.exports = function (RED) {
       // Run node
       const shuttleProcess = fork(
         nodeRedRuntime,
-        ['-u', instanceDir, '-p', options.port, options.projectName],
+        ['-u', instanceDir, '-p', options.port, '-D', 'editorTheme.projects.enabled=true', options.projectName],
         {
           silent: true,
           env

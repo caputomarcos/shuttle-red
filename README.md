@@ -1,6 +1,6 @@
 # Shuttle-RED
 
-Shuttle-RED allows you to start and control further Node-RED instances.
+Shuttle-RED allows you to start and control Node-RED instances from Node-RED itself.
 
 ## Current status
 

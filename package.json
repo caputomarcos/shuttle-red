@@ -1,7 +1,7 @@
 {
   "name": "shuttle-red",
   "version": "0.1.0",
-  "description": "A node that allows to start and control Node-RED instances.",
+  "description": "Start and control Node-RED instances from Node-RED itself.",
   "author": "Christian Geiger",
   "license": "MIT",
   "keywords": [
